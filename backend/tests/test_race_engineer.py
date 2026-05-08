@@ -332,6 +332,28 @@ class RaceEngineerTests(unittest.TestCase):
         self.assertEqual(follow_up["intent"]["intent_type"], "strategy")
         self.assertIsNotNone(follow_up["strategy_data"])
 
+    @patch("agents.race_engineer.get_session_telemetry_summary")
+    def test_analyze_query_honors_session_and_driver_overrides(self, mock_summary):
+        mock_summary.return_value = build_telemetry_fixture("VER", 2024, "Q", event="Monaco Grand Prix")
+
+        result = analyze_query(
+            "show me the data",
+            session_override={"event": "Monaco Grand Prix", "year": 2024, "session_type": "Q"},
+            driver_override="VER",
+        )
+
+        mock_summary.assert_called_with(
+            year=2024,
+            event="Monaco Grand Prix",
+            session_type="Q",
+            driver="VER",
+        )
+        self.assertEqual(result["intent"]["driver"], "VER")
+        self.assertEqual(result["intent"]["year"], 2024)
+        self.assertEqual(result["intent"]["event"], "Monaco Grand Prix")
+        self.assertEqual(result["intent"]["session_type"], "Q")
+        self.assertIsNone(result["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

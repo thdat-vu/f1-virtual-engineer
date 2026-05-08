@@ -75,6 +75,36 @@ class AnalyzeApiTests(unittest.TestCase):
         self.assertEqual(payload["strategy_data"]["confidence_band"], "medium")
         self.assertEqual(payload["strategy_data"]["recommended_pit_window_laps"], [8, 14])
 
+    @patch("app.main.analyze_query")
+    def test_analyze_endpoint_forwards_session_info_and_driver_to_agent(self, mock_analyze):
+        mock_analyze.return_value = {
+            "intent": {"driver": "VER", "year": 2024, "session_type": "Q", "intent_type": "telemetry"},
+            "telemetry_data": {"fallback": False},
+            "strategy_data": None,
+            "response_text": "ok",
+            "error": None,
+            "memory": {"history_size": 0, "retention_cap": 10, "last_driver": "VER"},
+            "execution": {"termination_reason": "completed", "step_limit": 6, "duration_ms": 1.0, "duration_limit_seconds": 5.0},
+            "retry": {"count": 0, "max_retries": 2, "retryable_exhausted": False, "retry_backoff_seconds": 0.1},
+        }
+        response = self.client.post(
+            "/analyze",
+            json={
+                "query": "show me the data",
+                "driver": "VER",
+                "session_info": {"event": "Monaco Grand Prix", "year": 2024, "session_type": "Q"},
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_analyze.assert_called_once()
+        args, kwargs = mock_analyze.call_args
+        self.assertEqual(args[0], "show me the data")
+        self.assertEqual(kwargs["driver_override"], "VER")
+        self.assertEqual(
+            kwargs["session_override"],
+            {"event": "Monaco Grand Prix", "year": 2024, "session_type": "Q"},
+        )
+
     def test_openapi_exposes_docs_metadata_for_core_routes(self):
         response = self.client.get("/openapi.json")
         self.assertEqual(response.status_code, 200)

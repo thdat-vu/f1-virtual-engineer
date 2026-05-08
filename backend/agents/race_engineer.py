@@ -121,6 +121,7 @@ class AgentState(TypedDict):
     memory: dict[str, Any]
     retry_count: int
     retry_metadata: dict[str, Any]
+    overrides: dict[str, Any]
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
@@ -178,6 +179,19 @@ parse_telemetry_intent = parse_query_intent
 
 def parse_intent_node(state: AgentState) -> AgentState:
     intent = parse_query_intent(state["query"])
+    overrides = state.get("overrides") or {}
+    if overrides:
+        if overrides.get("driver"):
+            intent["driver"] = overrides["driver"].upper()
+            intent["driver_candidates"] = [intent["driver"]]
+            intent["needs_clarification"] = False
+            intent["clarification_message"] = None
+        if overrides.get("event"):
+            intent["event"] = overrides["event"]
+        if overrides.get("year") is not None:
+            intent["year"] = overrides["year"]
+        if overrides.get("session_type"):
+            intent["session_type"] = overrides["session_type"]
     return {**state, "intent": intent}
 
 
@@ -423,9 +437,23 @@ def _call_with_retry(
         sleep(RETRY_BACKOFF_SECONDS)
 
 
-def analyze_query(query: str) -> dict[str, Any]:
+def analyze_query(
+    query: str,
+    *,
+    session_override: dict[str, Any] | None = None,
+    driver_override: str | None = None,
+) -> dict[str, Any]:
     import copy
     memory_snapshot = copy.deepcopy(_build_memory_snapshot())
+
+    overrides: dict[str, Any] = {}
+    if driver_override:
+        overrides["driver"] = driver_override
+    if session_override:
+        for key in ("event", "year", "session_type"):
+            if session_override.get(key) is not None:
+                overrides[key] = session_override[key]
+
     termination_reason = "completed"
     start_time = monotonic()
     try:
@@ -440,6 +468,7 @@ def analyze_query(query: str) -> dict[str, Any]:
                 "memory": memory_snapshot,
                 "retry_count": 0,
                 "retry_metadata": {},
+                "overrides": overrides,
             },
             config={"recursion_limit": MAX_GRAPH_STEPS},
         )

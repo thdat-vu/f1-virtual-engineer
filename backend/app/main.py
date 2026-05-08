@@ -90,7 +90,12 @@ async def get_schedule(year: int):
     ),
 )
 async def analyze_race_data(request: AnalyzeRequest):
-    result = analyze_query(request.query)
+    session_override = request.session_info.model_dump() if request.session_info else None
+    result = analyze_query(
+        request.query,
+        session_override=session_override,
+        driver_override=request.driver,
+    )
     return {
         "status": "error" if result.get("error") else "success",
         "agent_response": result["response_text"],
