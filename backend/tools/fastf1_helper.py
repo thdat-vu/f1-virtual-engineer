@@ -40,6 +40,36 @@ def _stats(series: pd.Series, unit: str) -> dict[str, Any]:
     }
 
 
+def _lap_time_features(chosen_lap: pd.Series | None) -> tuple[float | None, list[float]]:
+    """Extract (lap_duration_s, sector_boundaries_s) from a Lap row.
+
+    `sector_boundaries_s` is `[s1_end, s2_end]` measured in seconds-from-lap-start.
+    Both values are dropped if any sector time is missing — partial boundaries
+    would mislead the chart's x-axis.
+    """
+    if chosen_lap is None:
+        return None, []
+    lap_time = chosen_lap.get("LapTime") if hasattr(chosen_lap, "get") else None
+    duration: float | None = None
+    if lap_time is not None and not pd.isna(lap_time):
+        try:
+            duration = float(lap_time.total_seconds())
+        except AttributeError:
+            duration = None
+
+    s1 = chosen_lap.get("Sector1Time") if hasattr(chosen_lap, "get") else None
+    s2 = chosen_lap.get("Sector2Time") if hasattr(chosen_lap, "get") else None
+    boundaries: list[float] = []
+    if s1 is not None and s2 is not None and not pd.isna(s1) and not pd.isna(s2):
+        try:
+            s1_end = float(s1.total_seconds())
+            s2_end = s1_end + float(s2.total_seconds())
+            boundaries = [s1_end, s2_end]
+        except AttributeError:
+            boundaries = []
+    return duration, boundaries
+
+
 def _normalize_telemetry(
     telemetry: pd.DataFrame,
     *,
@@ -47,11 +77,14 @@ def _normalize_telemetry(
     event: str,
     session_type: str,
     driver: str,
+    chosen_lap: pd.Series | None = None,
 ) -> dict[str, Any]:
     required_columns = {"Speed": "km/h", "nGear": "gear", "RPM": "rpm"}
     missing = [col for col in required_columns if col not in telemetry.columns]
     if missing:
         raise ValueError(f"Missing required telemetry channels: {', '.join(missing)}")
+
+    lap_duration_s, sector_boundaries_s = _lap_time_features(chosen_lap)
 
     result: dict[str, Any] = {
         "driver": driver,
@@ -65,6 +98,8 @@ def _normalize_telemetry(
         "source": "fastf1",
         "fallback": False,
         "fallback_reason": None,
+        "lap_duration_s": lap_duration_s,
+        "sector_boundaries_s": sector_boundaries_s,
     }
 
     # Throttle and brake are optional — not all sessions include them
@@ -169,6 +204,8 @@ def get_session_telemetry_summary(
                 "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
                 "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
                 "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
+                "lap_duration_s": None,
+                "sector_boundaries_s": [],
                 "source": "fastf1",
                 "fallback": True,
                 "fallback_reason": "No laps found for requested driver/session.",
@@ -207,6 +244,7 @@ def get_session_telemetry_summary(
             event=event,
             session_type=session_type,
             driver=driver,
+            chosen_lap=chosen_lap,
         )
         result["lap_number"] = chosen_lap_number
         return result
@@ -220,6 +258,8 @@ def get_session_telemetry_summary(
             "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
             "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
             "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
+            "lap_duration_s": None,
+            "sector_boundaries_s": [],
             "source": "fastf1",
             "fallback": True,
             "fallback_reason": str(exc),

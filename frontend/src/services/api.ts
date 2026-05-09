@@ -47,6 +47,8 @@ export interface AnalyzeResponse {
     fallback?: boolean;
     fallback_reason?: string | null;
     lap_number?: number | null;
+    lap_duration_s?: number | null;
+    sector_boundaries_s?: number[];
   };
   strategy_data?: StrategyData | null;
   error?: string | null;
@@ -122,6 +124,8 @@ export interface TelemetryEnvelope {
     fallback: boolean;
     fallback_reason?: string | null;
     lap_number?: number | null;
+    lap_duration_s?: number | null;
+    sector_boundaries_s?: number[];
   } | null;
   error?: { code: string; message: string } | null;
 }

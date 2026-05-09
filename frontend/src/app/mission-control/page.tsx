@@ -104,6 +104,8 @@ export default function MissionControlPage() {
             fallback: res.data.fallback,
             fallback_reason: res.data.fallback_reason ?? null,
             lap_number: res.data.lap_number ?? lapNumber,
+            lap_duration_s: res.data.lap_duration_s ?? null,
+            sector_boundaries_s: res.data.sector_boundaries_s ?? [],
           },
         });
       })

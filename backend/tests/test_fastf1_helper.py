@@ -120,6 +120,74 @@ class FastF1HelperTests(unittest.TestCase):
         lap_one.get_telemetry.assert_not_called()
 
     @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_telemetry_summary_emits_lap_duration_and_sectors(self, mock_get_session):
+        # Lap row exposes LapTime + Sector1Time + Sector2Time as real timedeltas.
+        # _normalize_telemetry should derive lap_duration_s and sector_boundaries_s.
+        telemetry_df = pd.DataFrame(
+            {"Speed": [250.0, 260.0], "nGear": [7, 8], "RPM": [12000, 12500]}
+        )
+        chosen_lap = pd.Series({
+            "LapNumber": 5,
+            "LapTime": pd.Timedelta(seconds=86.161),
+            "Sector1Time": pd.Timedelta(seconds=24.5),
+            "Sector2Time": pd.Timedelta(seconds=29.3),
+        })
+        mock_lap = MagicMock()
+        mock_lap.get_telemetry.return_value = telemetry_df
+        # The helper reads sector/lap-time via .get() and the lap number via __getitem__/__contains__.
+        mock_lap.get.side_effect = chosen_lap.get
+        mock_lap.__getitem__.side_effect = chosen_lap.__getitem__
+        mock_lap.__contains__.side_effect = chosen_lap.__contains__
+
+        mock_laps = MagicMock()
+        mock_laps.empty = False
+        mock_laps.pick_fastest.return_value = mock_lap
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_telemetry_summary(2024, "Italian Grand Prix", "R", "GAS")
+
+        self.assertFalse(result["fallback"])
+        self.assertAlmostEqual(result["lap_duration_s"], 86.161, places=3)
+        self.assertEqual(len(result["sector_boundaries_s"]), 2)
+        self.assertAlmostEqual(result["sector_boundaries_s"][0], 24.5, places=3)
+        self.assertAlmostEqual(result["sector_boundaries_s"][1], 24.5 + 29.3, places=3)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_telemetry_summary_drops_sectors_when_missing(self, mock_get_session):
+        # When sector times are NaT, the helper must emit an empty list rather than
+        # half-populated boundaries that would mislead the chart x-axis.
+        telemetry_df = pd.DataFrame(
+            {"Speed": [200.0], "nGear": [6], "RPM": [10000]}
+        )
+        chosen_lap = pd.Series({
+            "LapNumber": 1,
+            "LapTime": pd.Timedelta(seconds=90.0),
+            "Sector1Time": pd.NaT,
+            "Sector2Time": pd.Timedelta(seconds=29.3),
+        })
+        mock_lap = MagicMock()
+        mock_lap.get_telemetry.return_value = telemetry_df
+        mock_lap.get.side_effect = chosen_lap.get
+        mock_lap.__getitem__.side_effect = chosen_lap.__getitem__
+        mock_lap.__contains__.side_effect = chosen_lap.__contains__
+
+        mock_laps = MagicMock()
+        mock_laps.empty = False
+        mock_laps.pick_fastest.return_value = mock_lap
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_telemetry_summary(2024, "Italian Grand Prix", "R", "GAS")
+
+        self.assertEqual(result["sector_boundaries_s"], [])
+        self.assertAlmostEqual(result["lap_duration_s"], 90.0, places=3)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
     def test_get_session_lap_list_success(self, mock_get_session):
         laps_df = pd.DataFrame(
             {

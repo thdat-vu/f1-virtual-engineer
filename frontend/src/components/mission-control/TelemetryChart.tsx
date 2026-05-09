@@ -43,6 +43,7 @@ function chartGeometry(series: number[], avg: number, compareSeries?: number[]) 
 
 export function TelemetryChart({
   label, unit, channelData, isLoading, hasData, animateKey, mode = "line", compareSeries, compareLabel,
+  sectorFractions,
 }: {
   label: string; unit: string;
   channelData?: { min: number; max: number; avg: number; series?: number[] } | null;
@@ -50,6 +51,7 @@ export function TelemetryChart({
   mode?: "line" | "area";
   compareSeries?: number[];
   compareLabel?: string;
+  sectorFractions?: number[];
 }) {
   const pathRef = useRef<SVGPathElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -143,6 +145,14 @@ export function TelemetryChart({
 
           {!isLoading && hasData && geom && (
             <svg className="h-full w-full" viewBox={`0 0 ${CHART_VB_W} ${CHART_VB_H}`} preserveAspectRatio="none">
+              {sectorFractions?.map((f, i) => (
+                <line
+                  key={`sec-${i}`}
+                  x1={f * CHART_VB_W} x2={f * CHART_VB_W} y1="0" y2={CHART_VB_H}
+                  stroke="var(--foreground-faint)" strokeWidth="0.5" strokeDasharray="1 2"
+                  opacity="0.55" vectorEffect="non-scaling-stroke"
+                />
+              ))}
               <line
                 x1="0" x2={CHART_VB_W} y1={geom.avgY} y2={geom.avgY}
                 stroke="var(--accent)" strokeWidth="0.4" strokeDasharray="3 3" opacity="0.35"

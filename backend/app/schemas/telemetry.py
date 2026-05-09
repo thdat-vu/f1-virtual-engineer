@@ -44,6 +44,14 @@ class TelemetrySummary(BaseModel):
         default=None,
         description="The lap the telemetry was sampled from. Null when no lap could be picked.",
     )
+    lap_duration_s: float | None = Field(
+        default=None,
+        description="Total lap duration in seconds. Null when LapTime is missing.",
+    )
+    sector_boundaries_s: list[float] = Field(
+        default_factory=list,
+        description="Cumulative sector-boundary times in seconds (S1 end, S2 end). Empty when sector data is missing.",
+    )
 
 
 class ApiError(BaseModel):
