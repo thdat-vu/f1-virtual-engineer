@@ -5,12 +5,16 @@ Two layers:
 - `test_compare_*` exercises the comparison logic with hand-built actual/expected pairs (fast, no FastF1).
 - `test_strategy_golden_runs_clean` runs the full golden set against the live strategy_analyzer using cached FastF1 data (slower, requires backend/data cache).
 
-The full-run test will skip if the cache is unavailable so contributors can run unit tests offline without the cache.
+The full-run test is opt-in via the `RUN_GOLDEN_FULL_EVAL=1` env var. CI does not
+ship the FastF1 cache (gitignored under `backend/data/`), so by default the full
+run is skipped to keep CI fast and offline-friendly. Set the env var locally
+when you want regression coverage on the heuristic itself.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -109,6 +113,11 @@ class GoldenSetTests(unittest.TestCase):
             self.assertIn("expected", c)
 
     def test_strategy_golden_runs_clean(self):
+        if os.environ.get("RUN_GOLDEN_FULL_EVAL") != "1":
+            self.skipTest(
+                "Full FastF1-backed eval is opt-in. Set RUN_GOLDEN_FULL_EVAL=1 to run; "
+                "the cache lives under backend/data/ and is gitignored."
+            )
         cache_dir = Path(__file__).resolve().parent.parent / "data"
         if not cache_dir.exists() or not any(cache_dir.iterdir()):
             self.skipTest("FastF1 cache not present; skipping full-run eval.")
