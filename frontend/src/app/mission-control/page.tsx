@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { analyzeTelemetry, getEventsByYear } from "@/services/api";
+import { analyzeTelemetry, getEventDrivers, getEventsByYear } from "@/services/api";
 import type { AnalyzeResponse, EventInfo } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { TeamIcon } from "@/components/icons/TeamIcons";
@@ -35,12 +35,11 @@ const SESSIONS = [
 ] as const;
 type SessionId = (typeof SESSIONS)[number]["id"];
 
-const DRIVERS = [
+const FALLBACK_DRIVERS = [
   "VER", "HAM", "LEC", "NOR", "SAI", "RUS", "PIA", "ALO",
   "STR", "PER", "GAS", "OCO", "TSU", "ALB", "HUL", "MAG",
   "BOT", "ZHO", "SAR", "RIC",
 ] as const;
-type DriverCode = (typeof DRIVERS)[number];
 
 const HOME_ICON_D = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
 const TELEMETRY_ICON_D = "M3 3v18h18M7 16l4-4 4 4 5-8";
@@ -201,10 +200,17 @@ export default function MissionControlPage() {
   const [year, setYear]       = useState<number>(2024);
   const [eventName, setEvent] = useState<string>("");
   const [session, setSession] = useState<SessionId>("R");
-  const [driver, setDriver]   = useState<DriverCode | "">("");
+  const [driver, setDriver]   = useState<string>("");
 
   const [events, setEvents]               = useState<EventInfo[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+
+  const [fetchedDrivers, setFetchedDrivers] = useState<readonly string[] | null>(null);
+  const [driversLoading, setDriversLoading] = useState(false);
+  const [driversFallback, setDriversFallback] = useState(false);
+
+  const drivers: readonly string[] =
+    eventName && fetchedDrivers && fetchedDrivers.length > 0 ? fetchedDrivers : FALLBACK_DRIVERS;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -228,6 +234,33 @@ export default function MissionControlPage() {
       });
     return () => { cancelled = true; };
   }, [year]);
+
+  // Load real driver roster when an event is picked; fall back to the static
+  // list if the backend returns an empty roster (event not raced yet, etc).
+  useEffect(() => {
+    if (!eventName) return;
+    let cancelled = false;
+    getEventDrivers(year, eventName)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.drivers.length > 0) {
+          setFetchedDrivers(res.drivers);
+          setDriversFallback(res.fallback);
+        } else {
+          setFetchedDrivers(null);
+          setDriversFallback(true);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFetchedDrivers(null);
+        setDriversFallback(true);
+      })
+      .finally(() => {
+        if (!cancelled) setDriversLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [year, eventName]);
 
   const canRun = !isLoading && !!eventName && !!driver;
 
@@ -260,7 +293,7 @@ export default function MissionControlPage() {
 
   const eventOptions   = events.map((e) => ({ id: e.name, label: e.name }));
   const sessionOptions = SESSIONS.map((s) => ({ id: s.id, label: s.label }));
-  const driverOptions  = DRIVERS.map((d) => ({ id: d, label: d }));
+  const driverOptions  = drivers.map((d) => ({ id: d, label: d }));
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -317,7 +350,12 @@ export default function MissionControlPage() {
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-5 py-2.5">
           <Select<string>
             value={String(year)}
-            onChange={(v) => setYear(Number(v))}
+            onChange={(v) => {
+              setYear(Number(v));
+              setDriver("");
+              setFetchedDrivers(null);
+              setDriversFallback(false);
+            }}
             options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
             placeholder="Year"
           />
@@ -325,7 +363,13 @@ export default function MissionControlPage() {
 
           <Select<string>
             value={eventName}
-            onChange={(v) => setEvent(v)}
+            onChange={(v) => {
+              setEvent(v);
+              setDriver("");
+              setFetchedDrivers(null);
+              setDriversFallback(false);
+              setDriversLoading(!!v);
+            }}
             options={eventOptions}
             loading={eventsLoading}
             placeholder="Grand Prix"
@@ -340,12 +384,18 @@ export default function MissionControlPage() {
           />
           <VDivider />
 
-          <Select<DriverCode | "">
+          <Select<string>
             value={driver}
-            onChange={(v) => setDriver(v as DriverCode)}
+            onChange={(v) => setDriver(v)}
             options={driverOptions}
+            loading={driversLoading}
             placeholder="Driver"
           />
+          {driversFallback && eventName ? (
+            <span className="label text-foreground-faint" title="Live roster unavailable; using fallback list.">
+              est.
+            </span>
+          ) : null}
 
           <div className="flex-1" />
 

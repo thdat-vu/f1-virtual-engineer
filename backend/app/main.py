@@ -4,9 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agents.race_engineer import analyze_query
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
-from app.schemas.schedule import ScheduleResponse
+from app.schemas.schedule import RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
-from tools.fastf1_helper import get_session_telemetry_summary, get_year_schedule
+from tools.fastf1_helper import get_event_drivers, get_session_telemetry_summary, get_year_schedule
 
 app = FastAPI(
     title="Apex-Intelligence: Virtual Race Engineer API",
@@ -77,6 +77,31 @@ async def get_schedule(year: int):
             error=f"No schedule found for year {year}."
         )
     return ScheduleResponse(year=year, events=events, status="success")
+
+
+@app.get(
+    "/events/{year}/{event}/drivers",
+    response_model=RosterResponse,
+    tags=["telemetry"],
+    summary="Fetch the driver roster for an event",
+    description=(
+        "Returns 3-letter driver codes that participated in the requested event. "
+        "Tries the Race session first, then Qualifying. Returns an empty list with a "
+        "fallback reason if neither session yields data (e.g. event hasn't run yet)."
+    ),
+)
+async def get_event_roster(year: int, event: str):
+    roster = get_event_drivers(year=year, event=event)
+    return RosterResponse(
+        year=roster["year"],
+        event=roster["event"],
+        drivers=roster["drivers"],
+        source_session=roster.get("source_session"),
+        fallback=roster["fallback"],
+        fallback_reason=roster.get("fallback_reason"),
+        status="error" if roster["fallback"] else "success",
+        error=roster.get("fallback_reason") if roster["fallback"] else None,
+    )
 
 
 @app.post(

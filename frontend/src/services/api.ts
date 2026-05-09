@@ -64,6 +64,17 @@ export interface ScheduleResponse {
   error?: string | null;
 }
 
+export interface RosterResponse {
+  year: number;
+  event: string;
+  drivers: string[];
+  source_session?: string | null;
+  status: "success" | "error";
+  fallback: boolean;
+  fallback_reason?: string | null;
+  error?: string | null;
+}
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api";
 
 export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
@@ -72,6 +83,14 @@ export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
     throw new Error(`Failed to fetch events for ${year}`);
   }
   return (await response.json()) as ScheduleResponse;
+}
+
+export async function getEventDrivers(year: number, event: string): Promise<RosterResponse> {
+  const response = await fetch(`${apiBaseUrl}/events/${year}/${encodeURIComponent(event)}/drivers`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch drivers for ${event} ${year}`);
+  }
+  return (await response.json()) as RosterResponse;
 }
 
 export async function analyzeTelemetry(

@@ -83,6 +83,45 @@ def get_year_schedule(year: int) -> list[dict[str, Any]]:
         return []
 
 
+def get_event_drivers(year: int, event: str) -> dict[str, Any]:
+    """
+    Return the driver roster (3-letter codes) for an event in `year`.
+
+    Tries the Race session first, then Qualifying as a fallback (useful for
+    upcoming events where no race has run yet). Returns a structured envelope
+    so the API endpoint can surface fallback reasons to the UI rather than 500.
+    """
+    last_error: str = "No drivers found in Race or Qualifying laps."
+    for session_type in ("R", "Q"):
+        try:
+            session = fastf1.get_session(year, event, session_type)
+            session.load(laps=True, telemetry=False, weather=False, messages=False)
+            laps = session.laps
+            if laps.empty:
+                continue
+            drivers = sorted({str(d).upper() for d in laps["Driver"].dropna().unique() if str(d)})
+            if drivers:
+                return {
+                    "year": year,
+                    "event": event,
+                    "drivers": drivers,
+                    "source_session": session_type,
+                    "fallback": False,
+                    "fallback_reason": None,
+                }
+        except Exception as exc:  # noqa: BLE001 — surface any FastF1 failure to caller
+            last_error = str(exc)
+
+    return {
+        "year": year,
+        "event": event,
+        "drivers": [],
+        "source_session": None,
+        "fallback": True,
+        "fallback_reason": last_error,
+    }
+
+
 def get_session_telemetry_summary(
     year: int,
     event: str,
