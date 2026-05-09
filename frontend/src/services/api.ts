@@ -46,6 +46,7 @@ export interface AnalyzeResponse {
     brake?: TelemetryChannel;
     fallback?: boolean;
     fallback_reason?: string | null;
+    lap_number?: number | null;
   };
   strategy_data?: StrategyData | null;
   error?: string | null;
@@ -76,6 +77,55 @@ export interface RosterResponse {
   error?: string | null;
 }
 
+export interface LapInfo {
+  lap_number: number;
+  lap_time_seconds: number | null;
+  compound: string | null;
+  is_pit_in: boolean;
+  is_pit_out: boolean;
+}
+
+export interface LapListResponse {
+  year: number;
+  event: string;
+  session_type: string;
+  driver: string;
+  laps: LapInfo[];
+  fastest_lap_number: number | null;
+  status: "success" | "error";
+  fallback: boolean;
+  fallback_reason?: string | null;
+  error?: string | null;
+}
+
+export interface TelemetryQueryRequest {
+  year: number;
+  event: string;
+  session_type: string;
+  driver: string;
+  lap_number?: number | null;
+}
+
+export interface TelemetryEnvelope {
+  status: "success" | "error";
+  data?: {
+    driver: string;
+    year: number;
+    event: string;
+    session_type: string;
+    sample_points: number;
+    speed: TelemetryChannel;
+    gear: TelemetryChannel;
+    rpm: TelemetryChannel;
+    throttle?: TelemetryChannel | null;
+    brake?: TelemetryChannel | null;
+    fallback: boolean;
+    fallback_reason?: string | null;
+    lap_number?: number | null;
+  } | null;
+  error?: { code: string; message: string } | null;
+}
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api";
 
 export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
@@ -92,6 +142,32 @@ export async function getEventDrivers(year: number, event: string): Promise<Rost
     throw new Error(`Failed to fetch drivers for ${event} ${year}`);
   }
   return (await response.json()) as RosterResponse;
+}
+
+export async function getEventLaps(
+  year: number,
+  event: string,
+  session_type: string,
+  driver: string,
+): Promise<LapListResponse> {
+  const url = `${apiBaseUrl}/laps/${year}/${encodeURIComponent(event)}/${encodeURIComponent(session_type)}/${encodeURIComponent(driver)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch laps for ${driver} at ${event} ${year}`);
+  }
+  return (await response.json()) as LapListResponse;
+}
+
+export async function getTelemetry(payload: TelemetryQueryRequest): Promise<TelemetryEnvelope> {
+  const response = await fetch(`${apiBaseUrl}/telemetry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Telemetry request failed with status ${response.status}`);
+  }
+  return (await response.json()) as TelemetryEnvelope;
 }
 
 export async function analyzeTelemetry(

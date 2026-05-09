@@ -7,6 +7,7 @@ from tools.fastf1_helper import (
     SERIES_POINTS,
     _downsample,
     extract_tyre_wear_features,
+    get_session_lap_list,
     get_session_telemetry_summary,
 )
 
@@ -74,6 +75,97 @@ class FastF1HelperTests(unittest.TestCase):
         self.assertTrue(result["fallback"])
         self.assertEqual(result["sample_points"], 0)
         self.assertEqual(result["speed"]["avg"], 0.0)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_telemetry_summary_picks_lap_when_lap_number_given(self, mock_get_session):
+        # Two laps for the driver; we request lap_number=2 and expect that lap's telemetry.
+        laps_df = pd.DataFrame({"LapNumber": [1, 2]})
+
+        lap_one = MagicMock()
+        lap_one.get_telemetry.return_value = pd.DataFrame(
+            {"Speed": [200.0], "nGear": [6], "RPM": [10000]}
+        )
+        lap_two = MagicMock()
+        lap_two.get_telemetry.return_value = pd.DataFrame(
+            {"Speed": [300.0], "nGear": [8], "RPM": [13000]}
+        )
+
+        # Filtering by `LapNumber == lap_number` returns a one-row frame; `iloc[0]`
+        # then gives us the chosen lap. We patch the filter to return the right row.
+        mock_laps = MagicMock()
+        mock_laps.empty = False
+        mock_laps.__getitem__.return_value = mock_laps  # laps[laps["LapNumber"] == n]
+        filtered = MagicMock()
+        filtered.empty = False
+        filtered.iloc.__getitem__.return_value = lap_two
+        # Configure the comparison: laps["LapNumber"] == 2 -> truthy mask, then
+        # laps[mask] -> filtered. We sidestep the mask plumbing by stubbing the
+        # `__getitem__` chain to short-circuit to `filtered`.
+        mock_laps.__getitem__.side_effect = lambda key: (
+            filtered if not isinstance(key, str) else laps_df[key]
+        )
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_telemetry_summary(
+            2023, "Japanese Grand Prix", "R", "HAM", lap_number=2,
+        )
+
+        self.assertFalse(result["fallback"])
+        self.assertEqual(result["lap_number"], 2)
+        self.assertEqual(result["speed"]["max"], 300.0)
+        lap_two.get_telemetry.assert_called_once()
+        lap_one.get_telemetry.assert_not_called()
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_lap_list_success(self, mock_get_session):
+        laps_df = pd.DataFrame(
+            {
+                "LapNumber": [1, 2, 3],
+                "LapTime": pd.to_timedelta([95.4, 92.1, 92.6], unit="s"),
+                "Compound": ["MEDIUM", "MEDIUM", "MEDIUM"],
+                "PitInTime": [pd.NaT, pd.NaT, pd.NaT],
+                "PitOutTime": [pd.Timedelta(seconds=2), pd.NaT, pd.NaT],
+            }
+        )
+        fastest_lap = laps_df.iloc[1]
+
+        mock_laps = MagicMock()
+        mock_laps.empty = False
+        mock_laps.iterrows.return_value = list(laps_df.iterrows())
+        mock_laps.pick_fastest.return_value = fastest_lap
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_lap_list(2023, "Japanese Grand Prix", "R", "ham")
+
+        self.assertFalse(result["fallback"])
+        self.assertEqual(result["driver"], "HAM")
+        self.assertEqual(len(result["laps"]), 3)
+        self.assertEqual(result["fastest_lap_number"], 2)
+        self.assertEqual(result["laps"][0]["lap_number"], 1)
+        self.assertAlmostEqual(result["laps"][0]["lap_time_seconds"], 95.4)
+        self.assertTrue(result["laps"][0]["is_pit_out"])
+        self.assertFalse(result["laps"][1]["is_pit_out"])
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_lap_list_fallback_when_empty(self, mock_get_session):
+        mock_laps = MagicMock()
+        mock_laps.empty = True
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_lap_list(2099, "Imaginary Grand Prix", "R", "HAM")
+
+        self.assertTrue(result["fallback"])
+        self.assertEqual(result["laps"], [])
+        self.assertIsNone(result["fastest_lap_number"])
 
     @patch("tools.fastf1_helper.fastf1.get_session")
     def test_extract_tyre_wear_features_success(self, mock_get_session):

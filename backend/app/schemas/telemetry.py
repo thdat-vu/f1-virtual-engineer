@@ -8,6 +8,11 @@ class TelemetryQueryRequest(BaseModel):
     event: str = Field(..., min_length=2, max_length=120)
     session_type: Literal["FP1", "FP2", "FP3", "Q", "R", "S", "SQ"]
     driver: str = Field(..., min_length=3, max_length=3, description="Driver code, e.g. HAM")
+    lap_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional lap to fetch telemetry from. If omitted, the fastest lap is used.",
+    )
 
 
 class TelemetryChannelStats(BaseModel):
@@ -35,6 +40,10 @@ class TelemetrySummary(BaseModel):
     source: str = "fastf1"
     fallback: bool = False
     fallback_reason: str | None = None
+    lap_number: int | None = Field(
+        default=None,
+        description="The lap the telemetry was sampled from. Null when no lap could be picked.",
+    )
 
 
 class ApiError(BaseModel):

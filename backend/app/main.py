@@ -4,9 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agents.race_engineer import analyze_query
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
-from app.schemas.schedule import RosterResponse, ScheduleResponse
+from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
-from tools.fastf1_helper import get_event_drivers, get_session_telemetry_summary, get_year_schedule
+from tools.fastf1_helper import (
+    get_event_drivers,
+    get_session_lap_list,
+    get_session_telemetry_summary,
+    get_year_schedule,
+)
 
 app = FastAPI(
     title="Apex-Intelligence: Virtual Race Engineer API",
@@ -135,13 +140,45 @@ async def analyze_race_data(request: AnalyzeRequest):
     }
 
 
+@app.get(
+    "/laps/{year}/{event}/{session_type}/{driver}",
+    response_model=LapListResponse,
+    tags=["telemetry"],
+    summary="Fetch the lap list for a driver in a session",
+    description=(
+        "Returns lap-by-lap metadata (lap number, lap time, compound, pit flags) "
+        "for the requested driver/session, used by the lap-selector UI."
+    ),
+)
+async def get_session_laps(year: int, event: str, session_type: str, driver: str):
+    data = get_session_lap_list(
+        year=year,
+        event=event,
+        session_type=session_type,
+        driver=driver,
+    )
+    return LapListResponse(
+        year=data["year"],
+        event=data["event"],
+        session_type=data["session_type"],
+        driver=data["driver"],
+        laps=data["laps"],
+        fastest_lap_number=data.get("fastest_lap_number"),
+        fallback=data["fallback"],
+        fallback_reason=data.get("fallback_reason"),
+        status="error" if data["fallback"] else "success",
+        error=data.get("fallback_reason") if data["fallback"] else None,
+    )
+
+
 @app.post(
     "/telemetry",
     response_model=TelemetryResponse,
     tags=["telemetry"],
     summary="Fetch normalized telemetry summary",
     description=(
-        "Returns speed, gear, RPM, and fallback metadata for a concrete driver/session query using the strict telemetry contract."
+        "Returns speed, gear, RPM, and fallback metadata for a concrete driver/session query using the strict telemetry contract. "
+        "When `lap_number` is omitted the fastest lap is used."
     ),
 )
 async def get_telemetry(request: TelemetryQueryRequest):
@@ -150,6 +187,7 @@ async def get_telemetry(request: TelemetryQueryRequest):
         event=request.event,
         session_type=request.session_type,
         driver=request.driver,
+        lap_number=request.lap_number,
     )
     summary = TelemetrySummary(**telemetry)
     if summary.fallback:

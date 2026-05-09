@@ -23,3 +23,24 @@ class RosterResponse(BaseModel):
     fallback: bool = False
     fallback_reason: Optional[str] = None
     error: Optional[str] = None
+
+
+class LapInfo(BaseModel):
+    lap_number: int
+    lap_time_seconds: Optional[float] = None
+    compound: Optional[str] = None
+    is_pit_in: bool = False
+    is_pit_out: bool = False
+
+
+class LapListResponse(BaseModel):
+    year: int
+    event: str
+    session_type: str
+    driver: str
+    laps: List[LapInfo]
+    fastest_lap_number: Optional[int] = None
+    status: str
+    fallback: bool = False
+    fallback_reason: Optional[str] = None
+    error: Optional[str] = None

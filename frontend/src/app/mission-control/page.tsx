@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { analyzeTelemetry, getEventDrivers, getEventsByYear } from "@/services/api";
-import type { AnalyzeResponse, EventInfo } from "@/services/api";
+import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry } from "@/services/api";
+import type { AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { TeamIcon } from "@/components/icons/TeamIcons";
 
@@ -95,6 +95,13 @@ function Select<T extends string>({
 /* ─── Chart geometry: maps real downsampled series + avg into SVG paths ── */
 const CHART_VB_W = 1000;
 const CHART_VB_H = 80;
+
+function formatLapTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(3).padStart(6, "0")}`;
+}
 
 function chartGeometry(series: number[], avg: number) {
   if (series.length < 2) return null;
@@ -274,6 +281,14 @@ export default function MissionControlPage() {
   const drivers: readonly string[] =
     eventName && fetchedDrivers && fetchedDrivers.length > 0 ? fetchedDrivers : FALLBACK_DRIVERS;
 
+  // Lap state. lap === "" means "Fastest" (default — the analyze endpoint already picks fastest).
+  // A non-empty value triggers a /telemetry override patching the chart series for the chosen lap.
+  const [lap, setLap] = useState<string>("");
+  const [laps, setLaps] = useState<LapInfo[]>([]);
+  const [fastestLapNumber, setFastestLapNumber] = useState<number | null>(null);
+  const [lapsLoading, setLapsLoading] = useState(false);
+  const [lapOverlayLoading, setLapOverlayLoading] = useState(false);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
@@ -324,6 +339,72 @@ export default function MissionControlPage() {
     return () => { cancelled = true; };
   }, [year, eventName]);
 
+  // Load lap roster whenever year/event/session/driver are all set.
+  // Empty roster (no laps yet) hides the lap selector so the UI doesn't pretend a choice is available.
+  useEffect(() => {
+    if (!eventName || !driver) return;
+    let cancelled = false;
+    getEventLaps(year, eventName, session, driver)
+      .then((res) => {
+        if (cancelled) return;
+        setLaps(res.laps ?? []);
+        setFastestLapNumber(res.fastest_lap_number);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLaps([]);
+        setFastestLapNumber(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLapsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [year, eventName, session, driver]);
+
+  // When the user picks a non-fastest lap and we already have a result, fetch telemetry for that
+  // specific lap and patch only `telemetry_data` on the existing analysis. The agent narrative
+  // intentionally stays untouched — that requires a fresh /analyze run.
+  useEffect(() => {
+    if (!result || !eventName || !driver) return;
+    if (lap === "") return; // fastest — leave whatever /analyze produced
+    const lapNumber = Number(lap);
+    if (!Number.isFinite(lapNumber)) return;
+    if (result.telemetry_data?.lap_number === lapNumber) return;
+
+    let cancelled = false;
+    getTelemetry({
+      year,
+      event: eventName,
+      session_type: session,
+      driver,
+      lap_number: lapNumber,
+    })
+      .then((res) => {
+        if (cancelled || !res.data) return;
+        setResult({
+          ...result,
+          telemetry_data: {
+            sample_points: res.data.sample_points,
+            speed: res.data.speed,
+            gear: res.data.gear,
+            rpm: res.data.rpm,
+            throttle: res.data.throttle ?? undefined,
+            brake: res.data.brake ?? undefined,
+            fallback: res.data.fallback,
+            fallback_reason: res.data.fallback_reason ?? null,
+            lap_number: res.data.lap_number ?? lapNumber,
+          },
+        });
+      })
+      .catch(() => {
+        /* silent — chart keeps existing series */
+      })
+      .finally(() => {
+        if (!cancelled) setLapOverlayLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [lap, result, eventName, driver, session, year, setResult]);
+
   const canRun = !isLoading && !!eventName && !!driver;
 
   const handleAnalyze = useCallback(async () => {
@@ -350,12 +431,26 @@ export default function MissionControlPage() {
 
   const displayDriver = result?.intent?.driver ?? driver ?? "—";
   const displayEvent  = result?.intent?.event  ?? eventName ?? "—";
+  const displayLap =
+    tel?.lap_number != null
+      ? `LAP ${tel.lap_number}${tel.lap_number === fastestLapNumber ? " · FAST" : ""}`
+      : hasData ? "FAST LAP" : null;
 
   const activeTeam = TEAMS.find((t) => t.id === theme) ?? TEAMS[0];
 
   const eventOptions   = events.map((e) => ({ id: e.name, label: e.name }));
   const sessionOptions = SESSIONS.map((s) => ({ id: s.id, label: s.label }));
   const driverOptions  = drivers.map((d) => ({ id: d, label: d }));
+  const lapOptions     = laps.map((l) => {
+    const lapTime = l.lap_time_seconds != null ? formatLapTime(l.lap_time_seconds) : null;
+    const tag =
+      l.lap_number === fastestLapNumber ? "★ FAST"
+      : l.is_pit_in ? "PIT IN"
+      : l.is_pit_out ? "OUT"
+      : l.compound ?? "";
+    const parts = [`L${l.lap_number}`, lapTime, tag].filter(Boolean);
+    return { id: String(l.lap_number), label: parts.join(" · ") };
+  });
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -383,7 +478,7 @@ export default function MissionControlPage() {
           <span className="label shrink-0 text-[length:var(--text-readout)]">Mission Control</span>
           <div className="h-3 w-px shrink-0 bg-border-strong" />
           <span className="readout shrink-0 text-[length:var(--text-readout)] text-foreground-dim">
-            {displayDriver} {"//"} {displayEvent}
+            {displayDriver} {"//"} {displayEvent}{displayLap ? ` // ${displayLap}` : ""}
           </span>
           <div className="flex-1" />
 
@@ -417,6 +512,9 @@ export default function MissionControlPage() {
               setDriver("");
               setFetchedDrivers(null);
               setDriversFallback(false);
+              setLap("");
+              setLaps([]);
+              setFastestLapNumber(null);
             }}
             options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
             placeholder="Year"
@@ -431,6 +529,9 @@ export default function MissionControlPage() {
               setFetchedDrivers(null);
               setDriversFallback(false);
               setDriversLoading(!!v);
+              setLap("");
+              setLaps([]);
+              setFastestLapNumber(null);
             }}
             options={eventOptions}
             loading={eventsLoading}
@@ -440,7 +541,13 @@ export default function MissionControlPage() {
 
           <Select<SessionId>
             value={session}
-            onChange={(v) => setSession(v)}
+            onChange={(v) => {
+              setSession(v);
+              setLap("");
+              setLaps([]);
+              setFastestLapNumber(null);
+              if (eventName && driver) setLapsLoading(true);
+            }}
             options={sessionOptions}
             placeholder="Session"
           />
@@ -448,7 +555,13 @@ export default function MissionControlPage() {
 
           <Select<string>
             value={driver}
-            onChange={(v) => setDriver(v)}
+            onChange={(v) => {
+              setDriver(v);
+              setLap("");
+              setLaps([]);
+              setFastestLapNumber(null);
+              if (eventName && v) setLapsLoading(true);
+            }}
             options={driverOptions}
             loading={driversLoading}
             placeholder="Driver"
@@ -457,6 +570,22 @@ export default function MissionControlPage() {
             <span className="label text-foreground-faint" title="Live roster unavailable; using fallback list.">
               est.
             </span>
+          ) : null}
+
+          <VDivider />
+
+          <Select<string>
+            value={lap}
+            onChange={(v) => {
+              setLap(v);
+              if (v && result) setLapOverlayLoading(true);
+            }}
+            options={lapOptions}
+            loading={lapsLoading}
+            placeholder="Fastest"
+          />
+          {lapOverlayLoading ? (
+            <span className="label text-foreground-faint">syncing…</span>
           ) : null}
 
           <div className="flex-1" />

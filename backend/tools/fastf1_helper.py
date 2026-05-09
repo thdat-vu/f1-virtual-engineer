@@ -144,9 +144,12 @@ def get_session_telemetry_summary(
     event: str,
     session_type: str,
     driver: str,
+    lap_number: int | None = None,
 ) -> dict[str, Any]:
     """
     Fetch telemetry summary (speed, gear, rpm) for a specific driver/session.
+    When `lap_number` is provided, telemetry is taken from that specific lap;
+    otherwise the driver's fastest lap is used.
     Returns a normalized dictionary that matches API schema.
     """
     driver = driver.upper()
@@ -169,17 +172,44 @@ def get_session_telemetry_summary(
                 "source": "fastf1",
                 "fallback": True,
                 "fallback_reason": "No laps found for requested driver/session.",
+                "lap_number": None,
             }
 
-        fastest_lap = laps.pick_fastest()
-        telemetry = fastest_lap.get_telemetry()
-        return _normalize_telemetry(
+        if lap_number is not None:
+            matches = laps[laps["LapNumber"] == lap_number]
+            if matches.empty:
+                return {
+                    "driver": driver,
+                    "year": year,
+                    "event": event,
+                    "session_type": session_type,
+                    "sample_points": 0,
+                    "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
+                    "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
+                    "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
+                    "source": "fastf1",
+                    "fallback": True,
+                    "fallback_reason": f"Lap {lap_number} not found for driver {driver}.",
+                    "lap_number": lap_number,
+                }
+            chosen_lap = matches.iloc[0]
+            chosen_lap_number = int(lap_number)
+        else:
+            chosen_lap = laps.pick_fastest()
+            chosen_lap_number = (
+                int(chosen_lap["LapNumber"]) if "LapNumber" in chosen_lap and pd.notna(chosen_lap["LapNumber"]) else None
+            )
+
+        telemetry = chosen_lap.get_telemetry()
+        result = _normalize_telemetry(
             telemetry,
             year=year,
             event=event,
             session_type=session_type,
             driver=driver,
         )
+        result["lap_number"] = chosen_lap_number
+        return result
     except Exception as exc:
         return {
             "driver": driver,
@@ -191,6 +221,93 @@ def get_session_telemetry_summary(
             "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
             "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
             "source": "fastf1",
+            "fallback": True,
+            "fallback_reason": str(exc),
+            "lap_number": lap_number,
+        }
+
+
+def get_session_lap_list(
+    year: int,
+    event: str,
+    session_type: str,
+    driver: str,
+) -> dict[str, Any]:
+    """
+    Return the per-lap roster for a driver/session, used by the lap-selector UI.
+
+    Each lap entry includes lap number, lap time (seconds), tyre compound, and
+    pit-in/out flags so the UI can render context like "Lap 14 — MEDIUM, 1:32.4".
+    """
+    driver = driver.upper()
+    try:
+        session = fastf1.get_session(year, event, session_type)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+        laps = session.laps.pick_driver(driver)
+        if laps.empty:
+            return {
+                "year": year,
+                "event": event,
+                "session_type": session_type,
+                "driver": driver,
+                "laps": [],
+                "fastest_lap_number": None,
+                "fallback": True,
+                "fallback_reason": "No laps found for requested driver/session.",
+            }
+
+        fastest_lap_number: int | None = None
+        try:
+            fastest = laps.pick_fastest()
+            if "LapNumber" in fastest and pd.notna(fastest["LapNumber"]):
+                fastest_lap_number = int(fastest["LapNumber"])
+        except Exception:  # noqa: BLE001 — fastest lap is best-effort metadata
+            fastest_lap_number = None
+
+        out: list[dict[str, Any]] = []
+        for _, lap in laps.iterrows():
+            lap_number = lap.get("LapNumber")
+            if pd.isna(lap_number):
+                continue
+            lap_time_seconds: float | None = None
+            lap_time_raw = lap.get("LapTime")
+            if lap_time_raw is not None and not pd.isna(lap_time_raw):
+                try:
+                    lap_time_seconds = float(lap_time_raw.total_seconds())
+                except AttributeError:
+                    lap_time_seconds = None
+
+            compound = lap.get("Compound")
+            compound = str(compound) if compound is not None and not pd.isna(compound) else None
+
+            pit_in = lap.get("PitInTime")
+            pit_out = lap.get("PitOutTime")
+            out.append({
+                "lap_number": int(lap_number),
+                "lap_time_seconds": lap_time_seconds,
+                "compound": compound,
+                "is_pit_in": bool(pit_in is not None and not pd.isna(pit_in)),
+                "is_pit_out": bool(pit_out is not None and not pd.isna(pit_out)),
+            })
+
+        return {
+            "year": year,
+            "event": event,
+            "session_type": session_type,
+            "driver": driver,
+            "laps": out,
+            "fastest_lap_number": fastest_lap_number,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+    except Exception as exc:  # noqa: BLE001 — surface any FastF1 failure to caller
+        return {
+            "year": year,
+            "event": event,
+            "session_type": session_type,
+            "driver": driver,
+            "laps": [],
+            "fastest_lap_number": None,
             "fallback": True,
             "fallback_reason": str(exc),
         }
