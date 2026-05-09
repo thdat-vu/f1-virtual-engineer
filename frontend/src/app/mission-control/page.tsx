@@ -103,10 +103,11 @@ function formatLapTime(seconds: number): string {
   return `${minutes}:${rest.toFixed(3).padStart(6, "0")}`;
 }
 
-function chartGeometry(series: number[], avg: number) {
+function chartGeometry(series: number[], avg: number, compareSeries?: number[]) {
   if (series.length < 2) return null;
-  const lo = Math.min(...series, avg);
-  const hi = Math.max(...series, avg);
+  const all = compareSeries && compareSeries.length > 1 ? [...series, ...compareSeries, avg] : [...series, avg];
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
   const span = hi - lo || 1;
   const padTop = CHART_VB_H * 0.075;
   const usable = CHART_VB_H * 0.85;
@@ -119,21 +120,31 @@ function chartGeometry(series: number[], avg: number) {
   const areaPath = `M0 ${CHART_VB_H} ${points
     .map(([x, y]) => `L${x.toFixed(1)} ${y.toFixed(1)}`)
     .join(" ")} L${CHART_VB_W} ${CHART_VB_H} Z`;
-  return { linePath, areaPath, avgY: norm(avg), norm, stepX };
+
+  let comparePath: string | null = null;
+  if (compareSeries && compareSeries.length > 1) {
+    const compareStep = CHART_VB_W / (compareSeries.length - 1);
+    comparePath = compareSeries
+      .map((v, i) => `${i === 0 ? "M" : "L"}${(i * compareStep).toFixed(1)} ${norm(v).toFixed(1)}`)
+      .join(" ");
+  }
+  return { linePath, areaPath, avgY: norm(avg), norm, stepX, comparePath };
 }
 
 function TelemetryChart({
-  label, unit, channelData, isLoading, hasData, animateKey, mode = "line",
+  label, unit, channelData, isLoading, hasData, animateKey, mode = "line", compareSeries, compareLabel,
 }: {
   label: string; unit: string;
   channelData?: { min: number; max: number; avg: number; series?: number[] } | null;
   isLoading: boolean; hasData: boolean; animateKey: number;
   mode?: "line" | "area";
+  compareSeries?: number[];
+  compareLabel?: string;
 }) {
   const pathRef = useRef<SVGPathElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const geom = channelData?.series ? chartGeometry(channelData.series, channelData.avg) : null;
+  const geom = channelData?.series ? chartGeometry(channelData.series, channelData.avg, compareSeries) : null;
   const series = channelData?.series ?? [];
   const hoverPoint =
     hoverIdx !== null && geom && hoverIdx < series.length
@@ -162,7 +173,12 @@ function TelemetryChart({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex shrink-0 items-baseline justify-between">
-        <span className="label">{label}</span>
+        <span className="label">
+          {label}
+          {compareLabel ? (
+            <span className="ml-2 text-foreground-faint">vs {compareLabel}</span>
+          ) : null}
+        </span>
         <AnimatePresence mode="wait">
           {hasData && channelData ? (
             <motion.div key="value" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
@@ -227,6 +243,17 @@ function TelemetryChart({
               {mode === "area" && (
                 <path d={geom.areaPath} fill="var(--accent)" opacity="0.16" />
               )}
+              {geom.comparePath && (
+                <path
+                  d={geom.comparePath}
+                  fill="none"
+                  stroke="var(--foreground-dim)"
+                  strokeWidth="1.0"
+                  strokeDasharray="2 2"
+                  opacity="0.7"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
               <path
                 ref={pathRef}
                 d={geom.linePath}
@@ -288,6 +315,12 @@ export default function MissionControlPage() {
   const [fastestLapNumber, setFastestLapNumber] = useState<number | null>(null);
   const [lapsLoading, setLapsLoading] = useState(false);
   const [lapOverlayLoading, setLapOverlayLoading] = useState(false);
+
+  // Comparison-driver state. When set, the Speed chart overlays this driver's fastest-lap trace
+  // as a dashed muted line. Always uses the fastest lap of the same year/event/session.
+  const [compareDriver, setCompareDriver] = useState<string>("");
+  const [compareSpeedSeries, setCompareSpeedSeries] = useState<number[] | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -405,6 +438,27 @@ export default function MissionControlPage() {
     return () => { cancelled = true; };
   }, [lap, result, eventName, driver, session, year, setResult]);
 
+  // Fetch comparison driver's fastest-lap speed trace whenever the compare driver changes.
+  // Reset of `compareSpeedSeries` on driver-cleared is handled in the onChange handler to
+  // avoid the `react-hooks/set-state-in-effect` rule.
+  useEffect(() => {
+    if (!compareDriver || !eventName) return;
+    let cancelled = false;
+    getTelemetry({ year, event: eventName, session_type: session, driver: compareDriver })
+      .then((res) => {
+        if (cancelled) return;
+        setCompareSpeedSeries(res.data?.speed?.series ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCompareSpeedSeries(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCompareLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [compareDriver, year, eventName, session]);
+
   const canRun = !isLoading && !!eventName && !!driver;
 
   const handleAnalyze = useCallback(async () => {
@@ -441,6 +495,9 @@ export default function MissionControlPage() {
   const eventOptions   = events.map((e) => ({ id: e.name, label: e.name }));
   const sessionOptions = SESSIONS.map((s) => ({ id: s.id, label: s.label }));
   const driverOptions  = drivers.map((d) => ({ id: d, label: d }));
+  const compareDriverOptions = drivers
+    .filter((d) => d !== driver)
+    .map((d) => ({ id: d, label: d }));
   const lapOptions     = laps.map((l) => {
     const lapTime = l.lap_time_seconds != null ? formatLapTime(l.lap_time_seconds) : null;
     const tag =
@@ -515,6 +572,8 @@ export default function MissionControlPage() {
               setLap("");
               setLaps([]);
               setFastestLapNumber(null);
+              setCompareDriver("");
+              setCompareSpeedSeries(null);
             }}
             options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
             placeholder="Year"
@@ -532,6 +591,8 @@ export default function MissionControlPage() {
               setLap("");
               setLaps([]);
               setFastestLapNumber(null);
+              setCompareDriver("");
+              setCompareSpeedSeries(null);
             }}
             options={eventOptions}
             loading={eventsLoading}
@@ -546,7 +607,9 @@ export default function MissionControlPage() {
               setLap("");
               setLaps([]);
               setFastestLapNumber(null);
+              setCompareSpeedSeries(null);
               if (eventName && driver) setLapsLoading(true);
+              if (compareDriver) setCompareLoading(true);
             }}
             options={sessionOptions}
             placeholder="Session"
@@ -561,6 +624,11 @@ export default function MissionControlPage() {
               setLaps([]);
               setFastestLapNumber(null);
               if (eventName && v) setLapsLoading(true);
+              // If user picks the same code as the compare slot, clear the compare slot.
+              if (v && v === compareDriver) {
+                setCompareDriver("");
+                setCompareSpeedSeries(null);
+              }
             }}
             options={driverOptions}
             loading={driversLoading}
@@ -588,6 +656,20 @@ export default function MissionControlPage() {
             <span className="label text-foreground-faint">syncing…</span>
           ) : null}
 
+          <VDivider />
+
+          <Select<string>
+            value={compareDriver}
+            onChange={(v) => {
+              setCompareDriver(v);
+              if (v) setCompareLoading(true);
+              else setCompareSpeedSeries(null);
+            }}
+            options={compareDriverOptions}
+            loading={compareLoading}
+            placeholder="vs Driver"
+          />
+
           <div className="flex-1" />
 
           <button
@@ -605,6 +687,9 @@ export default function MissionControlPage() {
             const ch = label === "Speed"    ? tel?.speed
                      : label === "Throttle" ? tel?.throttle
                      :                        tel?.brake;
+            const overlay = label === "Speed" && compareSpeedSeries && compareDriver
+              ? { compareSeries: compareSpeedSeries, compareLabel: compareDriver }
+              : {};
             return (
               <div key={label} className={`min-h-0 flex-1 ${i > 0 ? "mt-3" : ""}`}>
                 <TelemetryChart
@@ -615,6 +700,7 @@ export default function MissionControlPage() {
                   isLoading={isLoading}
                   hasData={hasData}
                   animateKey={animKey}
+                  {...overlay}
                 />
               </div>
             );
