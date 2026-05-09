@@ -27,31 +27,23 @@ const capabilityItems = [
 
 export function CapabilityGrid() {
   return (
-    <div className="grid gap-px md:grid-cols-2 xl:grid-cols-4" style={{ border: "1px solid var(--border)" }}>
-      {capabilityItems.map((item, i) => (
+    <div className="grid gap-px border border-border md:grid-cols-2 xl:grid-cols-4">
+      {capabilityItems.map((item) => (
         <article
           key={item.id}
-          className="p-6 transition-colors group"
-          style={{
-            background: "var(--surface)",
-            borderRight: i < capabilityItems.length - 1 ? "1px solid var(--border)" : undefined,
-          }}
+          className="group bg-surface p-6 transition-colors"
         >
-          <div className="flex items-start justify-between mb-6">
+          <div className="mb-6 flex items-start justify-between">
             <span className="label">{item.label}</span>
-            <span className="readout text-[0.6rem]" style={{ color: "var(--foreground-faint)" }}>
+            <span className="readout text-[length:var(--text-label)] text-foreground-faint">
               {item.id}
             </span>
           </div>
-          {/* accent rule animates on hover */}
-          <div
-            className="mb-4 h-px transition-all duration-300"
-            style={{ background: "var(--accent)", width: "24px" }}
-          />
-          <h3 className="text-sm font-semibold mb-3 leading-snug" style={{ color: "var(--foreground)" }}>
+          <div className="mb-4 h-px w-6 bg-accent transition-all duration-300 group-hover:w-12" />
+          <h3 className="mb-3 text-[length:var(--text-h3)] font-semibold leading-snug text-foreground">
             {item.title}
           </h3>
-          <p className="readout text-[0.65rem] leading-5" style={{ color: "var(--foreground-dim)" }}>
+          <p className="readout text-[length:var(--text-readout)] leading-5 text-foreground-dim">
             {item.body}
           </p>
         </article>

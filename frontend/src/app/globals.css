@@ -27,12 +27,45 @@
   --border:       rgba(255, 255, 255, 0.08);
   --border-strong:rgba(255, 255, 255, 0.14);
 
-  /* Typography */
+  /* Typography — family */
   --font-sans: -apple-system, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
 
-  /* Spacing rhythm */
-  --page-x: 2.5rem;   /* horizontal page padding */
+  /* Typography — scale (mobile baseline; clamps to desktop where used) */
+  --text-display: clamp(3rem, 6vw, 4.5rem);   /* hero headline */
+  --text-h1:      clamp(2rem, 4vw, 3rem);      /* section headline */
+  --text-h2:      1.5rem;                       /* sub-headline */
+  --text-h3:      1rem;                         /* card title */
+  --text-body:    0.9375rem;                    /* body copy */
+  --text-small:   0.8125rem;                    /* secondary copy */
+  --text-readout: 0.6875rem;                    /* sensor / metric value */
+  --text-label:   0.625rem;                     /* ALLCAPS eyebrow */
+
+  /* Typography — tracking */
+  --track-display: -0.04em;
+  --track-tight:   -0.02em;
+  --track-wide:    0.14em;
+  --track-widest:  0.28em;
+
+  /* Spacing rhythm — 8px base */
+  --page-x: 1.5rem;       /* horizontal page padding (mobile) */
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-5: 3rem;
+  --space-6: 5rem;
+  --space-7: 7.5rem;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 560ms;
+}
+
+@media (min-width: 640px) {
+  :root { --page-x: 2.5rem; }
 }
 
 /* ─────────────────────────────────────────────
@@ -118,6 +151,7 @@
 
 @theme inline {
   --color-background:       var(--background);
+  --color-overlay:          var(--overlay);
   --color-surface:          var(--surface);
   --color-surface-elevated: var(--surface-elevated);
   --color-foreground:       var(--foreground);
@@ -171,15 +205,24 @@ html, body {
 .display {
   font-family: var(--font-sans);
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--track-display);
   line-height: 1;
+}
+
+/* Section headline — slightly looser than display */
+.heading {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: var(--track-tight);
+  line-height: 1.05;
 }
 
 /* Label — ALLCAPS tracking */
 .label {
-  font-size: 0.65rem;
+  font-family: var(--font-sans);
+  font-size: var(--text-label);
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: var(--track-wide);
   text-transform: uppercase;
   color: var(--foreground-dim);
 }
@@ -189,6 +232,45 @@ html, body {
   height: 1px;
   background: var(--accent);
   opacity: 0.6;
+}
+
+/* Pill button — solid, accent-or-foreground driven via attribute */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-readout);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  padding: 0.75rem 1.25rem;
+  transition: opacity var(--dur-fast) var(--ease-standard),
+              transform var(--dur-fast) var(--ease-standard);
+}
+.btn:hover { opacity: 0.85; }
+.btn:active { transform: translateY(1px); }
+.btn--invert {
+  background: var(--foreground);
+  color: var(--background);
+}
+.btn--accent {
+  background: var(--accent);
+  color: var(--background);
+}
+
+/* Surface card — bordered panel on neutral surface */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.card--elevated { background: var(--surface-elevated); }
+
+/* Hairline divider — used as borders between cells when 1px gap needed */
+.divider {
+  border-top: 1px solid var(--border);
+}
+.divider-strong {
+  border-top: 1px solid var(--border-strong);
 }
 
 /* Subtle grid texture for hero areas */

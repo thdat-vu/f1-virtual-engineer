@@ -16,25 +16,21 @@ const strategyMetrics = [
   { label: "Confidence",    value: "74%" },
 ];
 
-/* Reusable fade-up with configurable delay */
 function FadeUp({
   delay = 0,
   children,
   className,
-  style,
 }: {
   delay?: number;
   children: React.ReactNode;
   className?: string;
-  style?: React.CSSProperties;
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.55, ease: "easeOut" }}
+      transition={{ delay, duration: 0.55, ease: [0.22, 0.61, 0.36, 1] }}
       className={className}
-      style={style}
     >
       {children}
     </motion.div>
@@ -43,98 +39,75 @@ function FadeUp({
 
 export function LandingHero() {
   return (
-    <section className="relative pt-16 pb-20 overflow-hidden">
-      {/* Subtle grid texture */}
+    <section className="relative overflow-hidden pt-16 pb-20">
       <div className="hero-grid pointer-events-none absolute inset-0 opacity-40" />
 
       <div className="relative z-10 grid gap-14 lg:grid-cols-[1fr_420px] lg:items-center">
-
-        {/* ── Left: copy ── */}
+        {/* Left column — copy */}
         <div>
-          {/* Status badge */}
-          <FadeUp delay={0}
-            className="inline-flex items-center gap-2.5 px-3 py-1.5 mb-8 readout text-[0.6rem] uppercase tracking-widest"
-            style={{ border: "1px solid var(--border)", color: "var(--foreground-dim)" }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.9)]" />
+          <FadeUp delay={0} className="mb-8 inline-flex items-center gap-2.5 border border-border px-3 py-1.5 readout text-[length:var(--text-label)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.9)]" />
             Race engineer system online
           </FadeUp>
 
-          {/* Headline */}
           <FadeUp delay={0.08}>
-            <h1
-              className="display text-5xl sm:text-6xl lg:text-[4.5rem] mb-6 leading-[0.95]"
-              style={{ color: "var(--foreground)" }}
-            >
+            <h1 className="display mb-6 text-[length:var(--text-display)] leading-[0.95] text-foreground">
               Build faster race calls from telemetry, not guesswork.
             </h1>
           </FadeUp>
 
           <FadeUp delay={0.16}>
-            <p className="text-base leading-7 mb-10 max-w-xl" style={{ color: "var(--foreground-dim)" }}>
+            <p className="mb-10 max-w-xl text-[length:var(--text-body)] leading-7 text-foreground-dim">
               Apex Intelligence turns Formula 1 session data into explainable pit-window,
               tyre-decay, and undercut insight — built for solo devs demoing real agentic AI.
             </p>
           </FadeUp>
 
           <FadeUp delay={0.22}>
-            <Link
-              href="/mission-control"
-              className="inline-flex items-center readout text-[0.65rem] font-bold uppercase tracking-widest px-5 py-3 transition-all"
-              style={{ background: "var(--foreground)", color: "var(--background)" }}
-            >
+            <Link href="/mission-control" className="btn btn--invert">
               Enter Mission Control →
             </Link>
           </FadeUp>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-4 mt-12">
+          <div className="mt-12 grid grid-cols-3 gap-4">
             {heroStats.map((s, i) => (
-              <FadeUp key={s.label} delay={0.3 + i * 0.08}
-                className="pt-4"
-                style={{ borderTop: "1px solid var(--border)" }}
-              >
-                <p className="display text-2xl mb-1" style={{ color: "var(--foreground)" }}>{s.value}</p>
+              <FadeUp key={s.label} delay={0.3 + i * 0.08} className="divider pt-4">
+                <p className="display mb-1 text-[length:var(--text-h2)] text-foreground">{s.value}</p>
                 <p className="label">{s.label}</p>
               </FadeUp>
             ))}
           </div>
         </div>
 
-        {/* ── Right: strategy preview card ── */}
+        {/* Right column — strategy preview card */}
         <motion.div
           initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.28, duration: 0.65, ease: "easeOut" }}
-          className="glass rounded-sm p-6 space-y-4"
-          style={{ background: "var(--surface-elevated)" }}
+          transition={{ delay: 0.28, duration: 0.65, ease: [0.22, 0.61, 0.36, 1] }}
+          className="card card--elevated space-y-4 p-6"
         >
-          <div className="flex items-center justify-between pb-4" style={{ borderBottom: "1px solid var(--border)" }}>
+          <div className="flex items-center justify-between border-b border-border pb-4">
             <div>
               <p className="label mb-1">Strategy Core</p>
-              <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+              <p className="text-[length:var(--text-small)] font-semibold text-foreground">
                 Japanese GP {"//"} Race {"//"} NOR
               </p>
             </div>
-            <span
-              className="readout text-[0.55rem] uppercase tracking-widest px-2.5 py-1"
-              style={{ border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", background: "rgba(74,222,128,0.08)" }}
-            >
+            <span className="readout border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-emerald-400">
               Signal stable
             </span>
           </div>
 
           <motion.div
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55, duration: 0.4, ease: "easeOut" }}
-            className="p-4"
-            style={{ border: "1px solid var(--accent-dim)", background: "var(--accent-dim)" }}
+            transition={{ delay: 0.55, duration: 0.4, ease: [0.22, 0.61, 0.36, 1] }}
+            className="border border-accent-dim bg-accent-dim p-4"
           >
-            <p className="label mb-1" style={{ color: "var(--foreground)" }}>Strategy Alert</p>
-            <p className="text-base font-bold mb-1.5" style={{ color: "var(--foreground)" }}>
+            <p className="label mb-1 text-foreground">Strategy Alert</p>
+            <p className="mb-1.5 text-[length:var(--text-body)] font-bold text-foreground">
               Pit window opens in 4 laps.
             </p>
-            <p className="readout text-[0.65rem] leading-5" style={{ color: "var(--foreground-dim)" }}>
+            <p className="readout text-[length:var(--text-readout)] leading-5 text-foreground-dim">
               Medium compound degradation crossing the threshold where undercut exposure becomes material.
             </p>
           </motion.div>
@@ -145,22 +118,20 @@ export function LandingHero() {
                 key={label}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.55 + i * 0.07, duration: 0.35, ease: "easeOut" }}
-                className="p-3"
-                style={{ border: "1px solid var(--border)" }}
+                transition={{ delay: 0.55 + i * 0.07, duration: 0.35, ease: [0.22, 0.61, 0.36, 1] }}
+                className="border border-border p-3"
               >
                 <p className="label mb-1">{label}</p>
-                <p className="readout text-sm font-semibold" style={{ color: "var(--foreground)" }}>{value}</p>
+                <p className="readout text-[length:var(--text-small)] font-semibold text-foreground">{value}</p>
               </motion.div>
             ))}
           </div>
         </motion.div>
       </div>
 
-      {/* ── Telemetry ribbon ── */}
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        transition={{ delay: 0.85, duration: 0.6, ease: "easeOut" }}
+        transition={{ delay: 0.85, duration: 0.6, ease: [0.22, 0.61, 0.36, 1] }}
         className="mt-14"
       >
         <TelemetryRibbon />
@@ -169,7 +140,6 @@ export function LandingHero() {
   );
 }
 
-/* ── Telemetry ribbon ── */
 const ribbonItems = [
   "SECTOR 1 +0.184",
   "SECTOR 2 −0.092",
@@ -186,15 +156,12 @@ const ribbonItems = [
 function TelemetryRibbon() {
   const doubled = [...ribbonItems, ...ribbonItems];
   return (
-    <div
-      className="telemetry-ribbon relative overflow-hidden py-2.5"
-      style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}
-    >
+    <div className="telemetry-ribbon relative overflow-hidden border-y border-border py-2.5">
       <div className="telemetry-ribbon__track flex min-w-max items-center gap-10 px-6">
         {doubled.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-3 shrink-0">
-            <span className="w-1 h-1 rounded-full" style={{ background: "var(--foreground-dim)" }} />
-            <span className="readout text-[0.6rem] uppercase tracking-widest" style={{ color: "var(--foreground-dim)" }}>
+          <div key={idx} className="flex shrink-0 items-center gap-3">
+            <span className="h-1 w-1 rounded-full bg-foreground-dim" />
+            <span className="readout text-[length:var(--text-label)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
               {item}
             </span>
           </div>

@@ -24,22 +24,25 @@ export function TeamSwitcher() {
 
   return (
     <div className="flex items-center gap-1.5">
-      {TEAMS.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => setTheme(t.id as TeamId)}
-          title={t.id}
-          className="transition-all rounded-sm shrink-0"
-          style={{
-            opacity:   theme === t.id ? 1 : 0.3,
-            transform: theme === t.id ? "scale(1.4)" : "scale(1)",
-            outline:   theme === t.id ? `1.5px solid ${t.color}` : "none",
-            outlineOffset: "2px",
-          }}
-        >
-        <TeamIcon id={t.id} size={24} />
-        </button>
-      ))}
+      {TEAMS.map((t) => {
+        const active = theme === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => setTheme(t.id as TeamId)}
+            title={t.id}
+            className="shrink-0 rounded-sm transition-all duration-[var(--dur-fast)]"
+            style={{
+              opacity:       active ? 1 : 0.3,
+              transform:     active ? "scale(1.4)" : "scale(1)",
+              outline:       active ? `1.5px solid ${t.color}` : "none",
+              outlineOffset: "2px",
+            }}
+          >
+            <TeamIcon id={t.id} size={24} />
+          </button>
+        );
+      })}
     </div>
   );
 }
