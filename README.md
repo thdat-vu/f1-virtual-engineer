@@ -52,12 +52,23 @@ To ensure maintainability and scalability, this project uses a monorepo structur
 
 ## Core Agent Capabilities
 
-The Virtual Engineer is equipped with strict tool-use policies and capabilities:
+The Virtual Engineer is equipped with strict tool-use policies and capabilities. Shipped capabilities are exposed as endpoints today; pending ones are tracked in [open issues](https://github.com/thdat-vu/f1-virtual-engineer/issues).
 
-* **`get_telemetry`**: Retrieves live speed, gear, and RPM data for specific drivers.
-* **`predict_tyre_wear`**: Analyzes lap time decay and surface temperatures to forecast tire degradation.
-* **`strategy_analyzer`**: Compares current pace against historical data to recommend optimal pit windows.
-* **`knowledge_retriever`**: Queries the RAG system for specific sporting regulations or past race incidents.
+| Capability | Status | Endpoint |
+| --- | --- | --- |
+| `get_telemetry` — speed/gear/RPM/throttle/brake summaries with fallback metadata | ✅ Shipped | `GET /telemetry`, `GET /laps/{...}` |
+| `strategy_analyzer` — pit-window recommendations with undercut/overcut risk and confidence band | ✅ Shipped | `POST /analyze` (strategy intent) |
+| `race_engineer_rationale` — Gemini Flash-generated natural-language summary, with deterministic template fallback when the LLM is unavailable | ✅ Shipped | `POST /analyze` (`rationale_source: "llm" \| "template"`) |
+| `radio_interpreter` — closed-set classification of team-radio transcripts (tyre/brake/engine/traffic/weather/strategy/none) with severity + trigger phrase | ✅ Shipped | `POST /radio/analyze` |
+| `predict_tyre_wear` — standalone tyre-degradation forecast | 🟡 Partial (covered inside `strategy_analyzer`) | — |
+| `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
+| Per-user query history + Google sign-in | ⏳ Planned | tracked in `#92`–`#95` |
+
+### Reliability features already in production
+
+* **Rate limiting** — `slowapi` token-bucket on the LLM and telemetry routes; structured 429 envelope with `retry_after_seconds` and a `Retry-After` header.
+* **Fail-closed LLM path** — every Gemini call is wrapped so a missing key, timeout, or malformed response degrades to a deterministic fallback rather than a 500.
+* **In-memory response cache (60 s TTL)** — repeated identical LLM calls are served from a SHA-256-keyed cache, namespaced by call type.
 
 ---
 
@@ -155,7 +166,9 @@ When the backend is running, you can inspect and try the API contract from:
 
 Recommended quick checks for reviewers:
 - use `/telemetry` to verify the strict telemetry schema and fallback contract
-- use `/analyze` to inspect telemetry-vs-strategy response envelopes for frontend integration
+- use `/analyze` to inspect telemetry-vs-strategy response envelopes for frontend integration; the response now includes a `rationale_source` field flagging whether the natural-language text came from Gemini or the deterministic template
+- use `/radio/analyze` to classify a team-radio transcript into one of seven closed-set tags with severity + trigger phrase
+- exceed `3/10s` on `/analyze` or `/radio/analyze` to see the structured `429` rate-limit envelope (`retry_after_seconds`, `Retry-After` header)
 
 ---
 
