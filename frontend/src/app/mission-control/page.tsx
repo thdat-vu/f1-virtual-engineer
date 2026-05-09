@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry } from "@/services/api";
+import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry, RateLimitError } from "@/services/api";
 import type { AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import {
@@ -39,6 +39,9 @@ export default function MissionControlPage() {
   const [compareDriver, setCompareDriver]             = useState<string>("");
   const [compareSpeedSeries, setCompareSpeedSeries]   = useState<number[] | null>(null);
   const [compareLoading, setCompareLoading]           = useState(false);
+
+  // Cleared on the next successful Analyze; surfaced in StrategyHUD when set.
+  const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -130,6 +133,7 @@ export default function MissionControlPage() {
   const handleAnalyze = useCallback(async () => {
     if (!canRun) return;
     setIsLoading(true);
+    setRateLimitMessage(null);
     try {
       const res = await analyzeTelemetry({
         query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
@@ -137,8 +141,11 @@ export default function MissionControlPage() {
         session_info: { event: eventName, year, session_type: session },
       });
       setResult(res as AnalyzeResponse);
-    } catch {
-      /* silent — HUD shows fallback state */
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        setRateLimitMessage(`Rate limited — retry in ${err.retryAfterSeconds}s`);
+      }
+      /* other errors silent — HUD shows fallback state */
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +201,7 @@ export default function MissionControlPage() {
 
       <StrategyHUD
         result={result} strat={strat} isLoading={isLoading} hasData={hasData}
-        session={session} theme={theme}
+        session={session} theme={theme} rateLimitMessage={rateLimitMessage}
       />
     </div>
   );

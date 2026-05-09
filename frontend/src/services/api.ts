@@ -130,6 +130,31 @@ export interface TelemetryEnvelope {
   error?: { code: string; message: string } | null;
 }
 
+export class RateLimitError extends Error {
+  readonly status = 429 as const;
+  readonly retryAfterSeconds: number;
+  constructor(retryAfterSeconds: number, message?: string) {
+    super(message ?? `Rate limited — retry in ${retryAfterSeconds}s`);
+    this.name = "RateLimitError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+async function readRateLimit(response: Response): Promise<RateLimitError> {
+  let retryAfter = Number(response.headers.get("Retry-After")) || 10;
+  let message: string | undefined;
+  try {
+    const body = (await response.clone().json()) as {
+      error?: { retry_after_seconds?: number; message?: string };
+    };
+    if (body?.error?.retry_after_seconds) retryAfter = body.error.retry_after_seconds;
+    if (body?.error?.message) message = body.error.message;
+  } catch {
+    /* non-JSON 429; keep header-based fallback */
+  }
+  return new RateLimitError(retryAfter, message);
+}
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api";
 
 export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
@@ -156,6 +181,7 @@ export async function getEventLaps(
 ): Promise<LapListResponse> {
   const url = `${apiBaseUrl}/laps/${year}/${encodeURIComponent(event)}/${encodeURIComponent(session_type)}/${encodeURIComponent(driver)}`;
   const response = await fetch(url);
+  if (response.status === 429) throw await readRateLimit(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch laps for ${driver} at ${event} ${year}`);
   }
@@ -168,6 +194,7 @@ export async function getTelemetry(payload: TelemetryQueryRequest): Promise<Tele
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (response.status === 429) throw await readRateLimit(response);
   if (!response.ok) {
     throw new Error(`Telemetry request failed with status ${response.status}`);
   }
@@ -185,6 +212,7 @@ export async function analyzeTelemetry(
     body: JSON.stringify(payload),
   });
 
+  if (response.status === 429) throw await readRateLimit(response);
   if (!response.ok) {
     throw new Error(`Analyze request failed with status ${response.status}`);
   }

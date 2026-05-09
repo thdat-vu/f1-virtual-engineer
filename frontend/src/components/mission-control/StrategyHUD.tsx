@@ -6,7 +6,7 @@ import { TeamIcon } from "@/components/icons/TeamIcons";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
-  result, strat, isLoading, hasData, session, theme,
+  result, strat, isLoading, hasData, session, theme, rateLimitMessage,
 }: {
   result: AnalyzeResponse | null;
   strat: StrategyData | null | undefined;
@@ -14,6 +14,7 @@ export function StrategyHUD({
   hasData: boolean;
   session: SessionId;
   theme: TeamId;
+  rateLimitMessage?: string | null;
 }) {
   const activeTeam = TEAMS.find((t) => t.id === theme) ?? TEAMS[0];
 
@@ -37,14 +38,18 @@ export function StrategyHUD({
 
       <div className="mx-4 mt-4 shrink-0 border border-accent-dim bg-accent-dim p-4">
         <p className="label mb-2 text-accent">
-          {hasData && strat?.undercut_risk === "high" ? "⚠ STRATEGY ALERT" : "SYSTEM STATUS"}
+          {rateLimitMessage
+            ? "⚠ RATE LIMITED"
+            : hasData && strat?.undercut_risk === "high" ? "⚠ STRATEGY ALERT" : "SYSTEM STATUS"}
         </p>
         <p className="readout text-[0.7rem] font-semibold uppercase leading-snug text-foreground">
-          {isLoading
-            ? "Fetching telemetry…"
-            : hasData
-              ? (result?.agent_response ?? "Analysis complete.")
-              : "Select year, grand prix, session and driver above."}
+          {rateLimitMessage
+            ? rateLimitMessage
+            : isLoading
+              ? "Fetching telemetry…"
+              : hasData
+                ? (result?.agent_response ?? "Analysis complete.")
+                : "Select year, grand prix, session and driver above."}
         </p>
       </div>
 

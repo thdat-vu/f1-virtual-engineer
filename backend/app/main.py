@@ -1,6 +1,10 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from agents.race_engineer import analyze_query
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
@@ -12,6 +16,31 @@ from tools.fastf1_helper import (
     get_session_telemetry_summary,
     get_year_schedule,
 )
+
+
+limiter = Limiter(key_func=get_remote_address, headers_enabled=False)
+
+
+def _retry_after_seconds(exc: RateLimitExceeded) -> int:
+    item = getattr(getattr(exc, "limit", None), "limit", None)
+    if item is None:
+        return 10
+    return int(item.GRANULARITY.seconds * item.multiples)
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    retry_after = _retry_after_seconds(exc)
+    body = {
+        "status": "error",
+        "error": {
+            "code": "rate_limited",
+            "message": f"Rate limit exceeded: {exc.detail}. Retry in {retry_after}s.",
+            "retry_after_seconds": retry_after,
+        },
+    }
+    response = JSONResponse(status_code=429, content=body)
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 app = FastAPI(
     title="Apex-Intelligence: Virtual Race Engineer API",
@@ -53,6 +82,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 
 @app.get(
@@ -119,17 +151,18 @@ async def get_event_roster(year: int, event: str):
         "or a baseline strategy recommendation with confidence, assumptions, and rationale."
     ),
 )
-async def analyze_race_data(request: AnalyzeRequest):
-    session_override = request.session_info.model_dump() if request.session_info else None
+@limiter.limit("3/10seconds")
+async def analyze_race_data(request: Request, body: AnalyzeRequest):
+    session_override = body.session_info.model_dump() if body.session_info else None
     result = analyze_query(
-        request.query,
+        body.query,
         session_override=session_override,
-        driver_override=request.driver,
+        driver_override=body.driver,
     )
     return {
         "status": "error" if result.get("error") else "success",
         "agent_response": result["response_text"],
-        "query": request.query,
+        "query": body.query,
         "intent": result["intent"],
         "telemetry_data": result["telemetry_data"],
         "strategy_data": result.get("strategy_data"),
@@ -150,7 +183,8 @@ async def analyze_race_data(request: AnalyzeRequest):
         "for the requested driver/session, used by the lap-selector UI."
     ),
 )
-async def get_session_laps(year: int, event: str, session_type: str, driver: str):
+@limiter.limit("30/10seconds")
+async def get_session_laps(request: Request, year: int, event: str, session_type: str, driver: str):
     data = get_session_lap_list(
         year=year,
         event=event,
@@ -181,13 +215,14 @@ async def get_session_laps(year: int, event: str, session_type: str, driver: str
         "When `lap_number` is omitted the fastest lap is used."
     ),
 )
-async def get_telemetry(request: TelemetryQueryRequest):
+@limiter.limit("30/10seconds")
+async def get_telemetry(request: Request, body: TelemetryQueryRequest):
     telemetry = get_session_telemetry_summary(
-        year=request.year,
-        event=request.event,
-        session_type=request.session_type,
-        driver=request.driver,
-        lap_number=request.lap_number,
+        year=body.year,
+        event=body.event,
+        session_type=body.session_type,
+        driver=body.driver,
+        lap_number=body.lap_number,
     )
     summary = TelemetrySummary(**telemetry)
     if summary.fallback:
