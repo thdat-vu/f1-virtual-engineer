@@ -4,10 +4,12 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests._helpers import reset_rate_limiter
 
 
 class TelemetryApiTests(unittest.TestCase):
     def setUp(self):
+        reset_rate_limiter()
         self.client = TestClient(app)
 
     @patch("app.main.get_session_telemetry_summary")

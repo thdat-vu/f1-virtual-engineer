@@ -15,6 +15,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests._helpers import reset_rate_limiter
 
 
 def _analyze_payload():
@@ -73,6 +74,7 @@ def _assert_rate_limited(case, response, expected_window: int):
 
 class RateLimitTests(unittest.TestCase):
     def setUp(self):
+        reset_rate_limiter()
         self.client = TestClient(app)
 
     @patch("app.main.analyze_query")
