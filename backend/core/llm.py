@@ -49,8 +49,8 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _context_key(context: dict[str, Any]) -> str:
-    payload = json.dumps(context, sort_keys=True, default=str)
+def _context_key(context: dict[str, Any], *, namespace: str = "rationale") -> str:
+    payload = json.dumps({"_ns": namespace, **context}, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -109,6 +109,67 @@ def generate_rationale(context: dict[str, Any], *, model: str = "gemini-2.0-flas
 
     _cache[cache_key] = (time.time(), text)
     return text
+
+
+def generate_structured(
+    user_payload: dict[str, Any],
+    *,
+    system_prompt: str,
+    model: str = "gemini-2.0-flash",
+) -> dict[str, Any] | None:
+    """Call Gemini and parse the response as JSON. Returns dict or None.
+
+    Mirrors ``generate_rationale``'s fail-closed contract: missing API key,
+    network error, JSON parse error, or empty completion all return None so
+    the caller can fall back to a deterministic response. The cache is shared
+    with ``generate_rationale`` but namespaced by the system prompt so a
+    radio classification can't collide with a rationale string.
+    """
+    cache_key = _context_key(
+        {"prompt": system_prompt, "payload": user_payload},
+        namespace="structured",
+    )
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        ts, text = cached
+        if time.time() - ts < _CACHE_TTL_SECONDS:
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                # Cache contained malformed JSON — drop it and fall through.
+                _cache.pop(cache_key, None)
+
+    genai = _ensure_configured()
+    if genai is None:
+        return None
+
+    try:
+        client = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=system_prompt,
+            generation_config={"response_mime_type": "application/json"},
+        )
+        prompt = f"Input (JSON):\n{json.dumps(user_payload, default=str, indent=2)}"
+        response = client.generate_content(prompt)
+        text = (getattr(response, "text", None) or "").strip()
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("Gemini structured call failed; caller will fall back", exc_info=True)
+        return None
+
+    if not text:
+        return None
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        _logger.warning("Gemini structured response was not valid JSON: %r", text[:200])
+        return None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    _cache[cache_key] = (time.time(), text)
+    return parsed
 
 
 def _reset_cache_for_tests() -> None:

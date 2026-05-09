@@ -7,7 +7,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from agents.race_engineer import analyze_query
+from agents.radio_interpreter import interpret_radio
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
+from app.schemas.radio import RadioRequest, RadioResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from tools.fastf1_helper import (
@@ -172,6 +174,30 @@ async def analyze_race_data(request: Request, body: AnalyzeRequest):
         "execution": result.get("execution"),
         "retry": result.get("retry"),
     }
+
+
+@app.post(
+    "/radio/analyze",
+    response_model=RadioResponse,
+    tags=["analysis"],
+    summary="Classify a team-radio transcript",
+    description=(
+        "Tags an F1 team-radio transcript with a single issue category, severity band, "
+        "and the verbatim trigger phrase. Falls back to a 'none' classification with "
+        "fallback metadata when the LLM is unavailable or returns malformed output."
+    ),
+)
+@limiter.limit("3/10seconds")
+async def analyze_radio(request: Request, body: RadioRequest):
+    result = interpret_radio(transcript=body.transcript, driver=body.driver)
+    return RadioResponse(
+        status="error" if result["fallback"] else "success",
+        classification=result["classification"],
+        severity=result["severity"],
+        trigger_phrase=result["trigger_phrase"],
+        fallback=result["fallback"],
+        fallback_reason=result.get("fallback_reason"),
+    )
 
 
 @app.get(
