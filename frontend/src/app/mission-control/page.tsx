@@ -92,37 +92,42 @@ function Select<T extends string>({
   );
 }
 
-/* ─── Chart path is a polyline through the real downsampled series ── */
-function buildPath(series: number[]): string {
-  if (series.length < 2) return "";
-  const vbW = 1000;
-  const vbH = 80;
-  const lo = Math.min(...series);
-  const hi = Math.max(...series);
+/* ─── Chart geometry: maps real downsampled series + avg into SVG paths ── */
+const CHART_VB_W = 1000;
+const CHART_VB_H = 80;
+
+function chartGeometry(series: number[], avg: number) {
+  if (series.length < 2) return null;
+  const lo = Math.min(...series, avg);
+  const hi = Math.max(...series, avg);
   const span = hi - lo || 1;
-  const padTop = vbH * 0.075;
-  const usable = vbH * 0.85;
-  const norm = (v: number) => vbH - ((v - lo) / span) * usable - padTop;
-  const stepX = vbW / (series.length - 1);
-  return series
-    .map((v, i) => `${i === 0 ? "M" : "L"}${(i * stepX).toFixed(1)} ${norm(v).toFixed(1)}`)
+  const padTop = CHART_VB_H * 0.075;
+  const usable = CHART_VB_H * 0.85;
+  const norm = (v: number) => CHART_VB_H - ((v - lo) / span) * usable - padTop;
+  const stepX = CHART_VB_W / (series.length - 1);
+  const points = series.map((v, i) => [i * stepX, norm(v)] as const);
+  const linePath = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`)
     .join(" ");
+  const areaPath = `M0 ${CHART_VB_H} ${points
+    .map(([x, y]) => `L${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ")} L${CHART_VB_W} ${CHART_VB_H} Z`;
+  return { linePath, areaPath, avgY: norm(avg) };
 }
 
 function TelemetryChart({
-  label, unit, channelData, isLoading, hasData, animateKey,
+  label, unit, channelData, isLoading, hasData, animateKey, mode = "line",
 }: {
   label: string; unit: string;
   channelData?: { min: number; max: number; avg: number; series?: number[] } | null;
   isLoading: boolean; hasData: boolean; animateKey: number;
+  mode?: "line" | "area";
 }) {
   const pathRef = useRef<SVGPathElement>(null);
-  const pathD = channelData?.series && channelData.series.length >= 2
-    ? buildPath(channelData.series)
-    : "";
+  const geom = channelData?.series ? chartGeometry(channelData.series, channelData.avg) : null;
 
   useEffect(() => {
-    if (!pathRef.current || !hasData || !pathD) return;
+    if (!pathRef.current || !hasData || !geom) return;
     const len = pathRef.current.getTotalLength();
     pathRef.current.style.strokeDasharray = `${len}`;
     pathRef.current.style.strokeDashoffset = `${len}`;
@@ -131,7 +136,7 @@ function TelemetryChart({
       { duration: 900, easing: "cubic-bezier(0.22,1,0.36,1)", fill: "forwards" },
     );
     return () => anim.cancel();
-  }, [hasData, animateKey, pathD]);
+  }, [hasData, animateKey, geom]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -141,16 +146,10 @@ function TelemetryChart({
           {hasData && channelData ? (
             <motion.div key="value" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
               className="flex items-baseline gap-3">
-              <span className="readout text-[0.55rem] text-foreground-faint">
-                {channelData.min.toFixed(0)} <span className="text-foreground-dim">min</span>
-              </span>
               <span className="readout text-lg font-semibold text-foreground">
                 {channelData.avg.toFixed(0)}
               </span>
-              <span className="readout text-[0.55rem] text-foreground-faint">
-                {channelData.max.toFixed(0)} <span className="text-foreground-dim">max</span>
-              </span>
-              <span className="label text-foreground-faint">{unit}</span>
+              <span className="label text-foreground-faint">avg {unit}</span>
             </motion.div>
           ) : (
             <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -161,32 +160,59 @@ function TelemetryChart({
         </AnimatePresence>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden border border-border bg-surface">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.div className="h-px w-10 bg-accent"
-              animate={{ scaleX: [1, 2.5, 1], opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-            />
+      <div className="relative flex min-h-0 flex-1 overflow-hidden border border-border bg-surface">
+        {/* Y-axis: max / avg / min anchored to chart frame */}
+        {hasData && channelData ? (
+          <div className="readout flex w-12 shrink-0 flex-col justify-between border-r border-border px-2 py-1.5 text-[0.55rem] text-foreground-faint">
+            <span title={`max ${unit}`}>{channelData.max.toFixed(0)}</span>
+            <span className="text-foreground-dim" title={`avg ${unit}`}>{channelData.avg.toFixed(0)}</span>
+            <span title={`min ${unit}`}>{channelData.min.toFixed(0)}</span>
           </div>
-        )}
+        ) : null}
 
-        {!isLoading && !hasData && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-faint">
-              Select session above and run analysis
-            </span>
-          </div>
-        )}
+        <div className="relative min-h-0 flex-1">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div className="h-px w-10 bg-accent"
+                animate={{ scaleX: [1, 2.5, 1], opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+          )}
 
-        {!isLoading && hasData && pathD && (
-          <svg className="h-full w-full" viewBox="0 0 1000 80" preserveAspectRatio="none">
-            <path ref={pathRef} d={pathD} fill="none" stroke="var(--accent)" strokeWidth="1.4" />
-          </svg>
-        )}
+          {!isLoading && !hasData && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-faint">
+                Select session above and run analysis
+              </span>
+            </div>
+          )}
 
-        <div className="absolute inset-x-0 bottom-0 h-px bg-accent"
-          style={{ opacity: hasData ? 0.2 : 0.06 }} />
+          {!isLoading && hasData && geom && (
+            <svg className="h-full w-full" viewBox={`0 0 ${CHART_VB_W} ${CHART_VB_H}`} preserveAspectRatio="none">
+              {/* avg reference line */}
+              <line
+                x1="0" x2={CHART_VB_W} y1={geom.avgY} y2={geom.avgY}
+                stroke="var(--accent)" strokeWidth="0.4" strokeDasharray="3 3" opacity="0.35"
+                vectorEffect="non-scaling-stroke"
+              />
+              {mode === "area" && (
+                <path d={geom.areaPath} fill="var(--accent)" opacity="0.16" />
+              )}
+              <path
+                ref={pathRef}
+                d={geom.linePath}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="1.4"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          )}
+
+          <div className="absolute inset-x-0 bottom-0 h-px bg-accent"
+            style={{ opacity: hasData ? 0.2 : 0.06 }} />
+        </div>
       </div>
     </div>
   );
@@ -418,6 +444,7 @@ export default function MissionControlPage() {
                 <TelemetryChart
                   label={label}
                   unit={label === "Speed" ? "KPH" : label === "Throttle" ? "%" : "BAR"}
+                  mode={label === "Speed" ? "line" : "area"}
                   channelData={ch}
                   isLoading={isLoading}
                   hasData={hasData}
