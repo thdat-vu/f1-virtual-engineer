@@ -21,6 +21,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(redirectPath, url.origin));
   }
 
-  await supabase.auth.exchangeCodeForSession(code);
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    const errorUrl = new URL("/", url.origin);
+    errorUrl.searchParams.set("auth_error", error.message);
+    return NextResponse.redirect(errorUrl);
+  }
   return NextResponse.redirect(new URL(redirectPath, url.origin));
 }

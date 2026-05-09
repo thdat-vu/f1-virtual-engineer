@@ -22,7 +22,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    // onAuthStateChange emits INITIAL_SESSION on mount with the correct value,
+    // so we don't also call getSession() — that would race and can cause a
+    // signed-out flash for already-authenticated users.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
     });
