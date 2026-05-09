@@ -112,7 +112,7 @@ function chartGeometry(series: number[], avg: number) {
   const areaPath = `M0 ${CHART_VB_H} ${points
     .map(([x, y]) => `L${x.toFixed(1)} ${y.toFixed(1)}`)
     .join(" ")} L${CHART_VB_W} ${CHART_VB_H} Z`;
-  return { linePath, areaPath, avgY: norm(avg) };
+  return { linePath, areaPath, avgY: norm(avg), norm, stepX };
 }
 
 function TelemetryChart({
@@ -124,7 +124,21 @@ function TelemetryChart({
   mode?: "line" | "area";
 }) {
   const pathRef = useRef<SVGPathElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const geom = channelData?.series ? chartGeometry(channelData.series, channelData.avg) : null;
+  const series = channelData?.series ?? [];
+  const hoverPoint =
+    hoverIdx !== null && geom && hoverIdx < series.length
+      ? { value: series[hoverIdx], x: hoverIdx * geom.stepX, y: geom.norm(series[hoverIdx]) }
+      : null;
+
+  const handlePointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!series.length || !frameRef.current) return;
+    const rect = frameRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setHoverIdx(Math.round(ratio * (series.length - 1)));
+  };
 
   useEffect(() => {
     if (!pathRef.current || !hasData || !geom) return;
@@ -146,10 +160,12 @@ function TelemetryChart({
           {hasData && channelData ? (
             <motion.div key="value" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
               className="flex items-baseline gap-3">
-              <span className="readout text-lg font-semibold text-foreground">
-                {channelData.avg.toFixed(0)}
+              <span className="readout text-lg font-semibold text-foreground tabular-nums">
+                {(hoverPoint?.value ?? channelData.avg).toFixed(0)}
               </span>
-              <span className="label text-foreground-faint">avg {unit}</span>
+              <span className="label text-foreground-faint">
+                {hoverPoint ? unit : `avg ${unit}`}
+              </span>
             </motion.div>
           ) : (
             <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -170,7 +186,12 @@ function TelemetryChart({
           </div>
         ) : null}
 
-        <div className="relative min-h-0 flex-1">
+        <div
+          ref={frameRef}
+          className="relative min-h-0 flex-1"
+          onPointerMove={handlePointer}
+          onPointerLeave={() => setHoverIdx(null)}
+        >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center">
               <motion.div className="h-px w-10 bg-accent"
@@ -207,6 +228,22 @@ function TelemetryChart({
                 strokeWidth="1.4"
                 vectorEffect="non-scaling-stroke"
               />
+              {hoverPoint && (
+                <>
+                  <line
+                    x1={hoverPoint.x} x2={hoverPoint.x} y1="0" y2={CHART_VB_H}
+                    stroke="var(--foreground)" strokeWidth="0.5" opacity="0.4"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={hoverPoint.x}
+                    cy={hoverPoint.y}
+                    r="1.2"
+                    fill="var(--foreground)"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
             </svg>
           )}
 
