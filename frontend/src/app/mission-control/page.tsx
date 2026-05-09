@@ -443,7 +443,7 @@ export default function MissionControlPage() {
               <div key={label} className={`min-h-0 flex-1 ${i > 0 ? "mt-3" : ""}`}>
                 <TelemetryChart
                   label={label}
-                  unit={label === "Speed" ? "KPH" : label === "Throttle" ? "%" : "BAR"}
+                  unit={label === "Speed" ? "KPH" : "%"}
                   mode={label === "Speed" ? "line" : "area"}
                   channelData={ch}
                   isLoading={isLoading}
