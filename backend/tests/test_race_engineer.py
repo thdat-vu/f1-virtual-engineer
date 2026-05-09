@@ -10,6 +10,7 @@ from agents.race_engineer import (
     parse_telemetry_intent,
     reset_memory_store,
 )
+from tests._helpers import force_template_rationale
 
 
 def build_telemetry_fixture(driver: str, year: int, session_type: str, event: str = "Japanese Grand Prix") -> dict:
@@ -35,6 +36,7 @@ def build_telemetry_fixture(driver: str, year: int, session_type: str, event: st
 class RaceEngineerTests(unittest.TestCase):
     def setUp(self):
         reset_memory_store()
+        force_template_rationale()
 
     def test_parse_telemetry_intent_requires_driver(self):
         intent = parse_telemetry_intent("toc do o japanese gp 2023")

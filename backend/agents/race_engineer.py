@@ -6,6 +6,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
+from core.llm import generate_rationale
 from tools.fastf1_helper import get_session_telemetry_summary
 from tools.strategy_helper import strategy_analyzer
 
@@ -122,6 +123,7 @@ class AgentState(TypedDict):
     retry_count: int
     retry_metadata: dict[str, Any]
     overrides: dict[str, Any]
+    rationale_source: str  # "llm" or "template"
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
@@ -335,40 +337,74 @@ def run_analysis_node(state: AgentState) -> AgentState:
     }
 
 
-def format_response_node(state: AgentState) -> AgentState:
+def _render_template(state: AgentState) -> str:
+    """Deterministic template rendering — the regression-safe fallback path."""
     if state.get("error"):
-        return {**state, "response_text": state["error"]}
+        return state["error"]
 
     if state.get("intent", {}).get("intent_type") == "strategy":
         strategy_bundle = state.get("strategy_data") or {}
         strategy = strategy_bundle.get("strategy") or {}
         if strategy_bundle.get("fallback"):
             message = strategy_bundle.get("fallback_reason") or "Strategy recommendation is unavailable for the current query."
-            return {**state, "response_text": f"Strategy unavailable: {message}"}
+            return f"Strategy unavailable: {message}"
 
         pit_window = strategy.get("recommended_pit_window_laps", [0, 0])
         confidence = strategy.get("confidence_band", "low")
         undercut_risk = strategy.get("undercut_risk", "unknown")
-        response_text = (
+        return (
             f"Baseline strategy recommendation for {strategy_bundle['driver']}: consider pit window laps {pit_window[0]}-{pit_window[1]}. "
             f"Undercut risk is {undercut_risk} with {confidence} confidence."
         )
-        return {**state, "response_text": response_text}
 
     telemetry = state.get("telemetry_data") or {}
     if telemetry.get("fallback"):
         message = telemetry.get("fallback_reason") or "Telemetry data is unavailable for the current query."
-        return {**state, "response_text": f"Telemetry unavailable: {message}"}
+        return f"Telemetry unavailable: {message}"
 
     speed = telemetry["speed"]
     gear = telemetry["gear"]
     rpm = telemetry["rpm"]
-    response_text = (
+    return (
         f"{telemetry['driver']} telemetry ({telemetry['event']} {telemetry['year']} {telemetry['session_type']}): "
         f"speed avg {speed['avg']:.1f} {speed['unit']} (min {speed['min']:.1f}, max {speed['max']:.1f}); "
         f"gear avg {gear['avg']:.1f}; rpm avg {rpm['avg']:.0f}."
     )
-    return {**state, "response_text": response_text}
+
+
+def _is_short_factual(state: AgentState) -> bool:
+    """Error / fallback branches stay on the template — no value in routing them through Gemini."""
+    if state.get("error"):
+        return True
+    if state.get("intent", {}).get("intent_type") == "strategy":
+        strategy_bundle = state.get("strategy_data") or {}
+        if strategy_bundle.get("fallback"):
+            return True
+    else:
+        telemetry = state.get("telemetry_data") or {}
+        if telemetry.get("fallback"):
+            return True
+    return False
+
+
+def _build_llm_context(state: AgentState) -> dict[str, Any]:
+    """Trim the agent state down to the facts the LLM is allowed to mention."""
+    return {
+        "intent": state.get("intent") or {},
+        "telemetry_data": state.get("telemetry_data") or {},
+        "strategy_data": state.get("strategy_data") or {},
+    }
+
+
+def format_response_node(state: AgentState) -> AgentState:
+    if _is_short_factual(state):
+        return {**state, "response_text": _render_template(state), "rationale_source": "template"}
+
+    llm_text = generate_rationale(_build_llm_context(state))
+    if llm_text:
+        return {**state, "response_text": llm_text, "rationale_source": "llm"}
+
+    return {**state, "response_text": _render_template(state), "rationale_source": "template"}
 
 
 workflow = StateGraph(AgentState)
@@ -469,6 +505,7 @@ def analyze_query(
                 "retry_count": 0,
                 "retry_metadata": {},
                 "overrides": overrides,
+                "rationale_source": "template",
             },
             config={"recursion_limit": MAX_GRAPH_STEPS},
         )
@@ -481,6 +518,7 @@ def analyze_query(
             "strategy_data": None,
             "response_text": "Could not process query due to graph execution error.",
             "error": str(exc),
+            "rationale_source": "template",
             "memory": {
                 "history_size": len(MEMORY_STORE),
                 "retention_cap": MEMORY_RETENTION_CAP,
@@ -532,6 +570,7 @@ def analyze_query(
         "telemetry_data": result.get("telemetry_data", {}),
         "strategy_data": strategy_payload,
         "response_text": result["response_text"],
+        "rationale_source": result.get("rationale_source", "template"),
         "error": result.get("error"),
         "memory": {
             "history_size": len(MEMORY_STORE),

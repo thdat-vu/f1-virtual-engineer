@@ -1,10 +1,12 @@
 import unittest
 from agents.race_engineer import parse_query_intent, analyze_query, reset_memory_store
+from tests._helpers import force_template_rationale
 from unittest.mock import patch
 
 class TestDriverFix(unittest.TestCase):
     def setUp(self):
         reset_memory_store()
+        force_template_rationale()
 
     def test_detect_full_name_verstappen(self):
         intent = parse_query_intent("How is Verstappen's pace?")

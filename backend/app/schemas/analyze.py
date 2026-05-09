@@ -74,6 +74,10 @@ class AnalyzeResponse(BaseModel):
     intent: AnalyzeIntent
     telemetry_data: TelemetrySummary | dict = {}
     strategy_data: StrategySummary | None = None
+    rationale_source: Literal["llm", "template"] = Field(
+        default="template",
+        description="Whether `agent_response` came from the Gemini LLM path or the deterministic template fallback.",
+    )
     error: str | None = None
     memory: AnalyzeMemory | None = None
     execution: AnalyzeExecution | None = None

@@ -51,6 +51,7 @@ export interface AnalyzeResponse {
     sector_boundaries_s?: number[];
   };
   strategy_data?: StrategyData | null;
+  rationale_source?: "llm" | "template";
   error?: string | null;
 }
 

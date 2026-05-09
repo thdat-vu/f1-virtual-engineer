@@ -166,6 +166,7 @@ async def analyze_race_data(request: Request, body: AnalyzeRequest):
         "intent": result["intent"],
         "telemetry_data": result["telemetry_data"],
         "strategy_data": result.get("strategy_data"),
+        "rationale_source": result.get("rationale_source", "template"),
         "error": result["error"],
         "memory": result.get("memory"),
         "execution": result.get("execution"),
