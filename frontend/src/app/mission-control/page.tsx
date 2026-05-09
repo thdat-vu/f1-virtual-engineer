@@ -92,35 +92,34 @@ function Select<T extends string>({
   );
 }
 
-/* ─── Chart builds a readable curve from min/avg/max ────────── */
-function buildPath(min: number, avg: number, max: number): string {
+/* ─── Chart path is a polyline through the real downsampled series ── */
+function buildPath(series: number[]): string {
+  if (series.length < 2) return "";
+  const vbW = 1000;
   const vbH = 80;
-  const norm = (v: number, lo: number, hi: number) =>
-    hi === lo ? vbH / 2 : vbH - ((v - lo) / (hi - lo)) * vbH * 0.85 - vbH * 0.075;
-
-  const lo = min * 0.95;
-  const hi = max * 1.05;
-  const yMin = norm(min, lo, hi);
-  const yAvg = norm(avg, lo, hi);
-  const yMax = norm(max, lo, hi);
-
-  return [
-    `M0 ${yMin.toFixed(1)}`,
-    `C100 ${yMin.toFixed(1)} 180 ${yMax.toFixed(1)} 300 ${yMax.toFixed(1)}`,
-    `C420 ${yMax.toFixed(1)} 500 ${yAvg.toFixed(1)} 650 ${yAvg.toFixed(1)}`,
-    `C800 ${yAvg.toFixed(1)} 900 ${yMin.toFixed(1)} 1000 ${(yMin + 4).toFixed(1)}`,
-  ].join(" ");
+  const lo = Math.min(...series);
+  const hi = Math.max(...series);
+  const span = hi - lo || 1;
+  const padTop = vbH * 0.075;
+  const usable = vbH * 0.85;
+  const norm = (v: number) => vbH - ((v - lo) / span) * usable - padTop;
+  const stepX = vbW / (series.length - 1);
+  return series
+    .map((v, i) => `${i === 0 ? "M" : "L"}${(i * stepX).toFixed(1)} ${norm(v).toFixed(1)}`)
+    .join(" ");
 }
 
 function TelemetryChart({
   label, unit, channelData, isLoading, hasData, animateKey,
 }: {
   label: string; unit: string;
-  channelData?: { min: number; max: number; avg: number } | null;
+  channelData?: { min: number; max: number; avg: number; series?: number[] } | null;
   isLoading: boolean; hasData: boolean; animateKey: number;
 }) {
   const pathRef = useRef<SVGPathElement>(null);
-  const pathD = channelData ? buildPath(channelData.min, channelData.avg, channelData.max) : "";
+  const pathD = channelData?.series && channelData.series.length >= 2
+    ? buildPath(channelData.series)
+    : "";
 
   useEffect(() => {
     if (!pathRef.current || !hasData || !pathD) return;

@@ -9,6 +9,7 @@ export interface TelemetryChannel {
   max: number;
   avg: number;
   unit: string;
+  series?: number[];
 }
 
 export interface StrategyData {

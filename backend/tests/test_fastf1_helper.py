@@ -3,7 +3,12 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from tools.fastf1_helper import extract_tyre_wear_features, get_session_telemetry_summary
+from tools.fastf1_helper import (
+    SERIES_POINTS,
+    _downsample,
+    extract_tyre_wear_features,
+    get_session_telemetry_summary,
+)
 
 
 class FastF1HelperTests(unittest.TestCase):
@@ -36,6 +41,24 @@ class FastF1HelperTests(unittest.TestCase):
         self.assertEqual(result["speed"]["unit"], "km/h")
         self.assertEqual(result["gear"]["unit"], "gear")
         self.assertEqual(result["rpm"]["unit"], "rpm")
+        # Below SERIES_POINTS threshold the series is the raw values verbatim.
+        self.assertEqual(result["speed"]["series"], [250.0, 260.0, 255.0])
+        self.assertEqual(result["gear"]["series"], [7.0, 8.0, 7.0])
+
+    def test_downsample_caps_series_length(self):
+        big = pd.Series(range(1000), dtype=float)
+        out = _downsample(big)
+        self.assertEqual(len(out), SERIES_POINTS)
+        # Mean-bucket aggregation must preserve overall min/max bounds.
+        self.assertGreaterEqual(min(out), float(big.min()))
+        self.assertLessEqual(max(out), float(big.max()))
+
+    def test_downsample_passthrough_short_series(self):
+        small = pd.Series([1.0, 2.0, 3.0])
+        self.assertEqual(_downsample(small), [1.0, 2.0, 3.0])
+
+    def test_downsample_empty_series(self):
+        self.assertEqual(_downsample(pd.Series([], dtype=float)), [])
 
     @patch("tools.fastf1_helper.fastf1.get_session")
     def test_get_session_telemetry_summary_fallback_when_no_laps(self, mock_get_session):

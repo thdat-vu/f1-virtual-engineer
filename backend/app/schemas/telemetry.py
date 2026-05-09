@@ -15,6 +15,10 @@ class TelemetryChannelStats(BaseModel):
     max: float
     avg: float
     unit: str
+    series: list[float] = Field(
+        default_factory=list,
+        description="Downsampled channel values along the lap (≤200 points).",
+    )
 
 
 class TelemetrySummary(BaseModel):

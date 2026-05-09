@@ -13,13 +13,30 @@ if not os.path.exists(CACHE_DIR):
 fastf1.Cache.enable_cache(CACHE_DIR)
 
 
-def _stats(series: pd.Series, unit: str) -> dict[str, float | str]:
+SERIES_POINTS = 200
+
+
+def _downsample(values: pd.Series, points: int = SERIES_POINTS) -> list[float]:
+    """Reduce a numeric Series to a fixed-length list using mean-bucket aggregation."""
+    n = len(values)
+    if n == 0:
+        return []
+    if n <= points:
+        return [float(v) for v in values.tolist()]
+    # Bucket the series into `points` equally sized chunks; take the mean of each.
+    bucket_indices = (pd.Series(range(n)) * points // n).to_numpy()
+    grouped = values.reset_index(drop=True).groupby(bucket_indices).mean()
+    return [float(v) for v in grouped.tolist()]
+
+
+def _stats(series: pd.Series, unit: str) -> dict[str, Any]:
     values = series.dropna()
     return {
         "min": float(values.min()),
         "max": float(values.max()),
         "avg": float(values.mean()),
         "unit": unit,
+        "series": _downsample(values),
     }
 
 
@@ -146,9 +163,9 @@ def get_session_telemetry_summary(
                 "event": event,
                 "session_type": session_type,
                 "sample_points": 0,
-                "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h"},
-                "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear"},
-                "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm"},
+                "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
+                "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
+                "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
                 "source": "fastf1",
                 "fallback": True,
                 "fallback_reason": "No laps found for requested driver/session.",
@@ -170,9 +187,9 @@ def get_session_telemetry_summary(
             "event": event,
             "session_type": session_type,
             "sample_points": 0,
-            "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h"},
-            "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear"},
-            "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm"},
+            "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
+            "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
+            "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
             "source": "fastf1",
             "fallback": True,
             "fallback_reason": str(exc),
