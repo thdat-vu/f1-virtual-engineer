@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { SupabaseProvider } from "@/components/auth/SupabaseProvider";
 
 const siteTitle = "Apex Intelligence | Virtual F1 Race Engineer";
 const siteDescription =
@@ -54,7 +55,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider />
-        {children}
+        <SupabaseProvider>{children}</SupabaseProvider>
       </body>
     </html>
   );

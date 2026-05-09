@@ -1,6 +1,7 @@
 "use client";
 
 import { TeamIcon } from "@/components/icons/TeamIcons";
+import { AuthButton } from "@/components/auth/AuthButton";
 import { TEAMS, type TeamId } from "./constants";
 
 export function MissionHeader({
@@ -20,6 +21,8 @@ export function MissionHeader({
         {displayDriver} {"//"} {displayEvent}{displayLap ? ` // ${displayLap}` : ""}
       </span>
       <div className="flex-1" />
+
+      <AuthButton />
 
       <div className="flex items-center gap-1.5">
         {TEAMS.map((t) => {

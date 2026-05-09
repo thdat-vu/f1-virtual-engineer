@@ -62,7 +62,8 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | `radio_interpreter` — closed-set classification of team-radio transcripts (tyre/brake/engine/traffic/weather/strategy/none) with severity + trigger phrase | ✅ Shipped | `POST /radio/analyze` |
 | `predict_tyre_wear` — standalone tyre-degradation forecast | 🟡 Partial (covered inside `strategy_analyzer`) | — |
 | `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
-| Per-user query history + Google sign-in | ⏳ Planned | tracked in `#92`–`#95` |
+| Google sign-in (Supabase Auth foundation) | ✅ Shipped | `/auth/callback` (frontend) |
+| Per-user query history (analyze + telemetry + radio) | ⏳ Planned | tracked in `#93`–`#95` |
 
 ### Reliability features already in production
 
@@ -100,6 +101,25 @@ The system is containerized for seamless local development, optimized for Apple 
     ```
     * *The Backend will be available at `http://localhost:8000`*
     * *The Frontend will be available at `http://localhost:3000`*
+
+### Authentication (Supabase + Google)
+
+The frontend now ships an optional Supabase Auth integration. Mission Control still works **anonymously** when the env vars are blank — the header just shows a disabled "Sign in unavailable" pill.
+
+To enable real sign-in:
+
+1. Create a Supabase project at <https://supabase.com>. From **Project Settings → API**, copy `URL` and `anon public` key into `frontend/.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+   ```
+2. In **Authentication → Providers**, enable Google. Paste the OAuth client ID + secret from your Google Cloud Console (OAuth consent screen + Web Application credentials).
+3. Add allowed redirect URLs in the Supabase auth settings:
+   - `http://localhost:3000/auth/callback` (local dev)
+   - your staging / production callback once that domain exists.
+4. Restart `npm run dev`. The Mission Control header now shows "Sign in with Google"; signed-in users see their email + a "Sign out" button. The session is cookie-based and survives a refresh.
+
+This PR only ships the auth foundation — no per-user data is persisted yet (tracked in `#93`–`#95`).
 
 ### CI/CD recommendation for first user feedback
 
