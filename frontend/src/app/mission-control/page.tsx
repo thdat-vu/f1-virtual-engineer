@@ -42,13 +42,8 @@ const DRIVERS = [
 ] as const;
 type DriverCode = (typeof DRIVERS)[number];
 
-const NAV = [
-  { id: "home",     d: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" },
-  { id: "telemetry",d: "M3 3v18h18M7 16l4-4 4 4 5-8" },
-  { id: "compare",  d: "M18 20V10M12 20V4M6 20v-6" },
-  { id: "history",  d: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { id: "settings", d: "M10.3 3.9L2 18a2 2 0 001.7 3h16.6A2 2 0 0022 18L13.7 3.9a2 2 0 00-3.4 0zM12 9v4M12 17h.01" },
-];
+const HOME_ICON_D = "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
+const TELEMETRY_ICON_D = "M3 3v18h18M7 16l4-4 4 4 5-8";
 
 /* ─── Small components ───────────────────────────────────────── */
 function NavIcon({ d }: { d: string }) {
@@ -275,22 +270,13 @@ export default function MissionControlPage() {
         <div className="mb-8 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-accent text-[0.85rem] font-black italic text-background">
           A
         </div>
-        <div className="flex flex-col items-center gap-5 text-foreground-dim">
-          {NAV.map((icon) =>
-            icon.id === "home" ? (
-              <Link key={icon.id} href="/" className="rounded p-1 text-foreground-dim transition-colors hover:text-foreground">
-                <NavIcon d={icon.d} />
-              </Link>
-            ) : (
-              <button key={icon.id}
-                className={`rounded p-1 transition-colors hover:text-foreground ${icon.id === "telemetry" ? "text-accent" : ""}`}>
-                <NavIcon d={icon.d} />
-              </button>
-            )
-          )}
-        </div>
-        <div className="mt-auto text-foreground-faint">
-          <NavIcon d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
+        <div className="flex flex-col items-center gap-5">
+          <Link href="/" title="Landing" className="rounded p-1 text-foreground-dim transition-colors hover:text-foreground">
+            <NavIcon d={HOME_ICON_D} />
+          </Link>
+          <span title="Telemetry (current view)" aria-current="page" className="rounded p-1 text-accent">
+            <NavIcon d={TELEMETRY_ICON_D} />
+          </span>
         </div>
       </nav>
 
@@ -469,7 +455,7 @@ export default function MissionControlPage() {
 
           {hasData && strat?.recommended_pit_window_laps?.length === 2 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="mt-4 border border-border p-3">
+              className="mb-4 mt-4 border border-border p-3">
               <p className="label mb-1">Pit Window</p>
               <p className="readout text-base font-bold text-accent">
                 LAP {strat.recommended_pit_window_laps[0]} – {strat.recommended_pit_window_laps[1]}
@@ -481,13 +467,6 @@ export default function MissionControlPage() {
               )}
             </motion.div>
           )}
-        </div>
-
-        <div className="shrink-0 p-4">
-          <button onClick={handleAnalyze} disabled={!canRun}
-            className="btn btn--accent w-full justify-center disabled:cursor-not-allowed disabled:opacity-30">
-            {isLoading ? "Computing…" : "Run Analysis"}
-          </button>
         </div>
       </aside>
     </div>
