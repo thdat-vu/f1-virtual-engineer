@@ -24,6 +24,8 @@ export function MissionHeader({
 
       <AuthButton />
 
+      <div className="h-3 w-px shrink-0 bg-border-strong" />
+
       <div className="flex items-center gap-1.5">
         {TEAMS.map((t) => {
           const active = theme === t.id;
