@@ -52,7 +52,9 @@ export function AuthButton() {
   return (
     <button
       type="button"
-      className={buttonClass}
+      aria-label="Sign in with Google"
+      title="Sign in with Google"
+      className="shrink-0 rounded-sm p-1 opacity-80 transition-opacity duration-[var(--dur-fast)] hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -66,7 +68,15 @@ export function AuthButton() {
         }
       }}
     >
-      Sign in with Google
+      {/* Plain <img> keeps the bundle small; the SVG is in /public. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/icons/google/google-icon-logo-svgrepo-com.svg"
+        alt=""
+        width={20}
+        height={20}
+        className="block"
+      />
     </button>
   );
 }
