@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
+import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
   FALLBACK_DRIVERS, MissionFooter, MissionHeader, NavRail,
   SelectorBar, StrategyHUD, TelemetryChartGrid, type SessionId,
@@ -11,6 +12,8 @@ import {
 
 export default function MissionControlPage() {
   const { theme, setTheme, result, setResult, isLoading, setIsLoading } = useMissionStore();
+  const { session: authSession } = useSupabase();
+  const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
 
   const [year, setYear]       = useState<number>(2024);
   const [eventName, setEvent] = useState<string>("");
@@ -135,12 +138,16 @@ export default function MissionControlPage() {
     setIsLoading(true);
     setRateLimitMessage(null);
     try {
-      const res = await analyzeTelemetry({
-        query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
-        driver,
-        session_info: { event: eventName, year, session_type: session },
-      });
+      const res = await analyzeTelemetry(
+        {
+          query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
+          driver,
+          session_info: { event: eventName, year, session_type: session },
+        },
+        authSession?.access_token,
+      );
       setResult(res as AnalyzeResponse);
+      if (authSession) setHistoryRefreshSignal((n) => n + 1);
     } catch (err) {
       if (err instanceof RateLimitError) {
         setRateLimitMessage(`Rate limited — retry in ${err.retryAfterSeconds}s`);
@@ -149,7 +156,14 @@ export default function MissionControlPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [canRun, driver, session, eventName, year, setIsLoading, setResult]);
+  }, [canRun, driver, session, eventName, year, setIsLoading, setResult, authSession]);
+
+  const handleSelectHistory = useCallback((item: AnalyzeHistoryItem) => {
+    if (item.year) setYear(item.year);
+    if (item.event) setEvent(item.event);
+    if (item.session_type) setSession(item.session_type as SessionId);
+    if (item.driver) setDriver(item.driver);
+  }, []);
 
   const tel     = result?.telemetry_data;
   const strat   = result?.strategy_data;
@@ -202,6 +216,8 @@ export default function MissionControlPage() {
       <StrategyHUD
         result={result} strat={strat} isLoading={isLoading} hasData={hasData}
         session={session} theme={theme} rateLimitMessage={rateLimitMessage}
+        historyRefreshSignal={historyRefreshSignal}
+        onSelectHistory={handleSelectHistory}
       />
     </div>
   );

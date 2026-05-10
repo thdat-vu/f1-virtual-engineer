@@ -204,12 +204,14 @@ export async function getTelemetry(payload: TelemetryQueryRequest): Promise<Tele
 
 export async function analyzeTelemetry(
   payload: AnalyzeRequest,
+  accessToken?: string,
 ): Promise<AnalyzeResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
   const response = await fetch(`${apiBaseUrl}/analyze`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -219,4 +221,33 @@ export async function analyzeTelemetry(
   }
 
   return (await response.json()) as AnalyzeResponse;
+}
+
+export interface AnalyzeHistoryItem {
+  id: string;
+  query: string;
+  driver: string | null;
+  event: string | null;
+  year: number | null;
+  session_type: string | null;
+  intent_type: string | null;
+  rationale_source: string;
+  created_at: string;
+}
+
+export interface AnalyzeHistoryResponse {
+  items: AnalyzeHistoryItem[];
+}
+
+export async function getAnalyzeHistory(
+  accessToken: string,
+  limit = 20,
+): Promise<AnalyzeHistoryResponse> {
+  const response = await fetch(`${apiBaseUrl}/analyze/history?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Analyze history request failed with status ${response.status}`);
+  }
+  return (await response.json()) as AnalyzeHistoryResponse;
 }

@@ -1,5 +1,7 @@
+import asyncio
+import logging
 import os
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -9,15 +11,21 @@ from slowapi.util import get_remote_address
 from agents.race_engineer import analyze_query
 from agents.radio_interpreter import interpret_radio
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
+from app.schemas.history import AnalyzeHistoryResponse
 from app.schemas.radio import RadioRequest, RadioResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
+from core.auth import get_optional_user_id, get_required_user_id
+from core.persistence import insert_analyze_history, list_analyze_history
 from tools.fastf1_helper import (
     get_event_drivers,
     get_session_lap_list,
     get_session_telemetry_summary,
     get_year_schedule,
 )
+
+
+_logger = logging.getLogger(__name__)
 
 
 limiter = Limiter(key_func=get_remote_address, headers_enabled=False)
@@ -154,13 +162,37 @@ async def get_event_roster(year: int, event: str):
     ),
 )
 @limiter.limit("3/10seconds")
-async def analyze_race_data(request: Request, body: AnalyzeRequest):
+async def analyze_race_data(
+    request: Request,
+    body: AnalyzeRequest,
+    user_id: str | None = Depends(get_optional_user_id),
+):
     session_override = body.session_info.model_dump() if body.session_info else None
     result = analyze_query(
         body.query,
         session_override=session_override,
         driver_override=body.driver,
     )
+
+    if user_id and not result.get("error"):
+        intent = result.get("intent") or {}
+        # Fire-and-forget so a slow/failing PostgREST call never blocks the
+        # /analyze response. The persistence helper is itself fail-closed.
+        asyncio.create_task(
+            insert_analyze_history(
+                user_id=user_id,
+                query=body.query,
+                driver=intent.get("driver") or body.driver,
+                event=intent.get("event") or (body.session_info.event if body.session_info else None),
+                year=intent.get("year") or (body.session_info.year if body.session_info else None),
+                session_type=intent.get("session_type")
+                    or (body.session_info.session_type if body.session_info else None),
+                agent_response=result["response_text"],
+                rationale_source=result.get("rationale_source", "template"),
+                intent_type=intent.get("intent_type"),
+            )
+        )
+
     return {
         "status": "error" if result.get("error") else "success",
         "agent_response": result["response_text"],
@@ -174,6 +206,38 @@ async def analyze_race_data(request: Request, body: AnalyzeRequest):
         "execution": result.get("execution"),
         "retry": result.get("retry"),
     }
+
+
+@app.get(
+    "/analyze/history",
+    response_model=AnalyzeHistoryResponse,
+    tags=["analysis"],
+    summary="List the signed-in user's recent /analyze queries",
+    description=(
+        "Returns the most recent analyze queries for the authenticated user, ordered "
+        "newest-first. Requires a valid Supabase JWT — anonymous callers receive 401."
+    ),
+)
+async def get_analyze_history(
+    request: Request,
+    limit: int = Query(20, ge=1, le=50),
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        items = await list_analyze_history(user_id=user_id, limit=limit)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to load analyze history", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "history_unavailable",
+                    "message": "History service is temporarily unavailable.",
+                },
+            },
+        )
+    return {"items": items}
 
 
 @app.post(
