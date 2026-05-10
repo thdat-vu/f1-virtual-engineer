@@ -63,7 +63,8 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | `predict_tyre_wear` — standalone tyre-degradation forecast | 🟡 Partial (covered inside `strategy_analyzer`) | — |
 | `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
 | Google sign-in (Supabase Auth foundation) | ✅ Shipped | `/auth/callback` (frontend) |
-| Per-user query history (analyze + telemetry + radio) | ⏳ Planned | tracked in `#93`–`#95` |
+| Per-user `/analyze` history — opt-in persistence by session, list endpoint, Mission Control "Recent" panel | ✅ Shipped | `POST /analyze` (writes when JWT present), `GET /analyze/history` |
+| Per-user telemetry + radio history | ⏳ Planned | tracked in `#94`, `#95` |
 
 ### Reliability features already in production
 
@@ -119,7 +120,7 @@ To enable real sign-in:
    - your staging / production callback once that domain exists.
 4. Restart `npm run dev`. The Mission Control header now shows "Sign in with Google"; signed-in users see their email + a "Sign out" button. The session is cookie-based and survives a refresh.
 
-This PR only ships the auth foundation — no per-user data is persisted yet (tracked in `#93`–`#95`).
+Signed-in users now also get `/analyze` history persisted server-side (Supabase Postgres + RLS) and surfaced in the Mission Control "Recent" panel. Per-user telemetry + radio history are still tracked under `#94`–`#95`.
 
 ### CI/CD recommendation for first user feedback
 
