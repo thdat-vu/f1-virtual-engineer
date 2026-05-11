@@ -22,6 +22,7 @@ from core.persistence import (
     list_analyze_history,
     list_telemetry_history,
 )
+from core.timing import TimingMiddleware, snapshot_metrics
 from tools.fastf1_helper import (
     get_event_drivers,
     get_session_lap_list,
@@ -98,6 +99,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Timing instrumentation must wrap *inside* CORS so the X-Process-Time header
+# survives the CORS layer. Starlette executes middlewares in reverse order of
+# registration, so registering TimingMiddleware *after* CORSMiddleware puts
+# it closer to the route handler.
+app.add_middleware(TimingMiddleware)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
@@ -110,6 +117,21 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 )
 async def root():
     return {"message": "Welcome to Apex-Intelligence Virtual Race Engineer API"}
+
+
+@app.get(
+    "/metrics",
+    tags=["system"],
+    summary="Per-route timing snapshot",
+    description=(
+        "Returns rolling-window timing stats (last 50 samples per route) collected by "
+        "`TimingMiddleware`. Counts, p50/p95/max in milliseconds, plus the most recent "
+        "sample. Single-process, in-memory only — fine for the MVP, not for production "
+        "scale. Set `METRICS_ENABLED=false` to disable both header and collection."
+    ),
+)
+async def get_metrics():
+    return {"routes": snapshot_metrics()}
 
 
 @app.get(

@@ -192,6 +192,33 @@ Recommended quick checks for reviewers:
 - use `/radio/analyze` to classify a team-radio transcript into one of seven closed-set tags with severity + trigger phrase
 - exceed `3/10s` on `/analyze` or `/radio/analyze` to see the structured `429` rate-limit envelope (`retry_after_seconds`, `Retry-After` header)
 
+### Measuring response time
+
+Every response now carries an `X-Process-Time` header (milliseconds, server-side wall-clock):
+
+```bash
+curl -s -o /dev/null -D - http://localhost:8000/events/2024 | grep -i x-process-time
+# X-Process-Time: 1843.2
+```
+
+For an aggregated view across the last 50 samples per route:
+
+```bash
+curl -s http://localhost:8000/metrics | jq
+# { "routes": { "GET /events/{year}": { "count": 12, "p50_ms": 1620.4, "p95_ms": 2810.1, "max_ms": 3104.7, "last_ms": 1843.2 }, ... } }
+```
+
+For end-to-end timing of a full curl call (network + server):
+
+```bash
+curl -s -o /dev/null -w 'total=%{time_total}s ttfb=%{time_starttransfer}s\n' \
+  http://localhost:8000/events/2024
+```
+
+Browser side, open DevTools → Network and look at the waterfall: that's the only number the user actually feels. The header tells you whether slowness is server-side or network/CORS.
+
+Set `METRICS_ENABLED=false` in `backend/.env` to disable both the header and the in-memory buffer (e.g. for stricter prod setups).
+
 ---
 
 ## Safety & Evaluation
