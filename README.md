@@ -74,6 +74,7 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 * **In-memory response cache (60 s TTL)** — repeated identical LLM calls are served from a SHA-256-keyed cache, namespaced by call type.
 * **FastF1 result cache + threadpool offload** — schedule/roster/lap-list responses are cached in-process for 24 h, telemetry summaries + tyre features for 1 h. Fallback/empty results are *not* cached, so a transient FastF1 hiccup never sticks. Helper calls now run on the FastAPI threadpool (`asyncio.to_thread`) so a slow FastF1 fetch no longer blocks the event loop for concurrent requests.
 * **Pre-baked cache warmup** — `backend/scripts/prebake.py` records helper outputs to `backend/data/prebake/<helper>/*.json.gz`. On startup the FastAPI lifespan hook seeds the in-process TTLCaches from those snapshots, so the first user after a restart hits warm-cache latency for the demo session set instead of paying the multi-second FastF1 cold load.
+* **Optional Redis L2 cache** — set `REDIS_URL` (e.g. `redis://localhost:6379/0`) and the FastF1 helpers gain a second tier: L1 in-process → L2 Redis → compute. Multi-worker / multi-pod deployments share the same warmed-up state instead of each process refilling its own cache. A Redis outage degrades silently to "L1 only" — the API never 5xxs because of cache infrastructure. Inspect `GET /metrics` → `cache.redis_enabled` to confirm the wiring.
 
 ### Pre-baking the FastF1 cache
 

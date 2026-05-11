@@ -11,6 +11,8 @@ import fastf1
 import pandas as pd
 from cachetools import TTLCache
 
+from core import redis_cache
+
 _logger = logging.getLogger(__name__)
 
 # Setup caching for FastF1
@@ -51,6 +53,17 @@ _lap_list_cache: TTLCache = TTLCache(maxsize=256, ttl=86400)
 _telemetry_cache: TTLCache = TTLCache(maxsize=256, ttl=3600)
 _tyre_features_cache: TTLCache = TTLCache(maxsize=256, ttl=3600)
 _cache_lock = threading.Lock()
+
+# TTL per cache (seconds). Used for Redis SET ex= so the two tiers expire
+# on the same schedule. Keep this aligned with the TTLCache definitions
+# above — if you change one, change the other.
+_TTL_FOR_NAME: dict[str, int] = {
+    "schedule": 86400,
+    "roster": 86400,
+    "lap_list": 86400,
+    "telemetry": 3600,
+    "tyre_features": 3600,
+}
 
 
 # Pre-bake (slice C of #100):
@@ -140,21 +153,40 @@ def _ttl_cached(
     """Cache only "good" results. Fallback/empty results bypass the cache
     so transient errors don't get pinned for the full TTL.
 
-    `name` identifies the cache in the prebake dir layout (slice C of #100)."""
+    Two-tier lookup (slice D of #100):
+        L1 in-process TTLCache → L2 Redis (when REDIS_URL is set) → compute.
+    On a compute we write to both tiers. L2 is best-effort: any Redis
+    error degrades silently to "L1 only" so the API never 5xxs because
+    of cache infrastructure.
+
+    `name` identifies the cache in the prebake dir layout (slice C) and
+    in the Redis key namespace (slice D)."""
 
     _PREBAKE_NAMES[name] = cache
+    ttl = _TTL_FOR_NAME.get(name, 3600)
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             key = (args, tuple(sorted(kwargs.items())))
+            # L1: in-process.
             with _cache_lock:
                 if key in cache:
                     return cache[key]
+            # L2: Redis (shared across workers). Uses the same stable digest
+            # as the prebake layout so a Redis hit can also seed L1.
+            digest = _stable_key_digest(args, kwargs)
+            shared = redis_cache.get(name, digest)
+            if shared is not None and is_good(shared):
+                with _cache_lock:
+                    cache[key] = shared
+                return shared
+            # Compute.
             result = func(*args, **kwargs)
             if is_good(result):
                 with _cache_lock:
                     cache[key] = result
+                redis_cache.set(name, digest, result, ttl_seconds=ttl)
                 if _prebake_recording_enabled():
                     _write_prebake_entry(name, args, kwargs, result)
             return result

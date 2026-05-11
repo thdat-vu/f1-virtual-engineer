@@ -24,6 +24,7 @@ from core.persistence import (
     list_telemetry_history,
 )
 from core.timing import TimingMiddleware, snapshot_metrics
+from core import redis_cache
 from tools.fastf1_helper import (
     get_event_drivers,
     get_session_lap_list,
@@ -149,7 +150,10 @@ async def root():
     ),
 )
 async def get_metrics():
-    return {"routes": snapshot_metrics()}
+    return {
+        "routes": snapshot_metrics(),
+        "cache": {"redis_enabled": redis_cache.is_enabled()},
+    }
 
 
 @app.get(
