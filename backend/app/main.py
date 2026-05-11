@@ -142,7 +142,7 @@ async def get_metrics():
     description="Returns a list of all Grand Prix events for the requested year.",
 )
 async def get_schedule(year: int):
-    events = get_year_schedule(year)
+    events = await asyncio.to_thread(get_year_schedule, year)
     if not events:
         return ScheduleResponse(
             year=year,
@@ -165,7 +165,7 @@ async def get_schedule(year: int):
     ),
 )
 async def get_event_roster(year: int, event: str):
-    roster = get_event_drivers(year=year, event=event)
+    roster = await asyncio.to_thread(get_event_drivers, year=year, event=event)
     return RosterResponse(
         year=roster["year"],
         event=roster["event"],
@@ -195,7 +195,8 @@ async def analyze_race_data(
     user_id: str | None = Depends(get_optional_user_id),
 ):
     session_override = body.session_info.model_dump() if body.session_info else None
-    result = analyze_query(
+    result = await asyncio.to_thread(
+        analyze_query,
         body.query,
         session_override=session_override,
         driver_override=body.driver,
@@ -303,7 +304,8 @@ async def analyze_radio(request: Request, body: RadioRequest):
 )
 @limiter.limit("30/10seconds")
 async def get_session_laps(request: Request, year: int, event: str, session_type: str, driver: str):
-    data = get_session_lap_list(
+    data = await asyncio.to_thread(
+        get_session_lap_list,
         year=year,
         event=event,
         session_type=session_type,
@@ -339,7 +341,8 @@ async def get_telemetry(
     body: TelemetryQueryRequest,
     user_id: str | None = Depends(get_optional_user_id),
 ):
-    telemetry = get_session_telemetry_summary(
+    telemetry = await asyncio.to_thread(
+        get_session_telemetry_summary,
         year=body.year,
         event=body.event,
         session_type=body.session_type,

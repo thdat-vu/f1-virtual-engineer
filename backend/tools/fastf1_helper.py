@@ -1,8 +1,11 @@
 import os
-from typing import Any
+import threading
+from functools import wraps
+from typing import Any, Callable
 
 import fastf1
 import pandas as pd
+from cachetools import TTLCache
 
 # Setup caching for FastF1
 # Ensure the backend/data directory exists
@@ -14,6 +17,77 @@ fastf1.Cache.enable_cache(CACHE_DIR)
 
 
 SERIES_POINTS = 200
+
+
+# In-process result caches for FastF1 helpers (#100 slice B).
+#
+# Why a custom wrapper instead of `@cachetools.cached`:
+# the helpers return *fallback dicts* on failure (network blip, FastF1
+# decode error) rather than raising. We must not cache those — otherwise
+# a transient error sticks for hours. The wrapper below caches only when
+# the result is "good" (per `is_good`), and treats anything else as a
+# pass-through to the underlying call.
+#
+# TTLs:
+# - Schedule / roster / lap list: 24h. Past events are immutable; for the
+#   current weekend a 24h drift is acceptable on an MVP demo (cache is
+#   per-process anyway, restart clears it).
+# - Telemetry summary / tyre features: 1h. Same immutability argument
+#   but the entries are bulkier, so we keep the window tighter to bound
+#   memory.
+#
+# Caches are *per-process* (single uvicorn worker for the MVP). For multi-
+# worker / multi-pod deployment, slice D of #100 moves this to Redis.
+
+_schedule_cache: TTLCache = TTLCache(maxsize=32, ttl=86400)
+_roster_cache: TTLCache = TTLCache(maxsize=128, ttl=86400)
+_lap_list_cache: TTLCache = TTLCache(maxsize=256, ttl=86400)
+_telemetry_cache: TTLCache = TTLCache(maxsize=256, ttl=3600)
+_tyre_features_cache: TTLCache = TTLCache(maxsize=256, ttl=3600)
+_cache_lock = threading.Lock()
+
+
+def _ttl_cached(
+    cache: TTLCache,
+    is_good: Callable[[Any], bool],
+) -> Callable:
+    """Cache only "good" results. Fallback/empty results bypass the cache
+    so transient errors don't get pinned for the full TTL."""
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            with _cache_lock:
+                if key in cache:
+                    return cache[key]
+            result = func(*args, **kwargs)
+            if is_good(result):
+                with _cache_lock:
+                    cache[key] = result
+            return result
+
+        wrapper.cache_clear = lambda: _clear_cache(cache)  # type: ignore[attr-defined]
+        return wrapper
+
+    return decorator
+
+
+def _clear_cache(cache: TTLCache) -> None:
+    with _cache_lock:
+        cache.clear()
+
+
+def _reset_caches_for_tests() -> None:
+    """Wipe every helper cache. Tests call this in setUp to isolate state."""
+    for cache in (
+        _schedule_cache,
+        _roster_cache,
+        _lap_list_cache,
+        _telemetry_cache,
+        _tyre_features_cache,
+    ):
+        _clear_cache(cache)
 
 
 def _downsample(values: pd.Series, points: int = SERIES_POINTS) -> list[float]:
@@ -113,6 +187,7 @@ def _normalize_telemetry(
     return result
 
 
+@_ttl_cached(_schedule_cache, is_good=lambda r: bool(r))
 def get_year_schedule(year: int) -> list[dict[str, Any]]:
     """
     Fetch the event schedule for a specific year and return a list of event dictionaries.
@@ -135,6 +210,7 @@ def get_year_schedule(year: int) -> list[dict[str, Any]]:
         return []
 
 
+@_ttl_cached(_roster_cache, is_good=lambda r: not r.get("fallback"))
 def get_event_drivers(year: int, event: str) -> dict[str, Any]:
     """
     Return the driver roster (3-letter codes) for an event in `year`.
@@ -174,6 +250,7 @@ def get_event_drivers(year: int, event: str) -> dict[str, Any]:
     }
 
 
+@_ttl_cached(_telemetry_cache, is_good=lambda r: not r.get("fallback"))
 def get_session_telemetry_summary(
     year: int,
     event: str,
@@ -267,6 +344,7 @@ def get_session_telemetry_summary(
         }
 
 
+@_ttl_cached(_lap_list_cache, is_good=lambda r: not r.get("fallback"))
 def get_session_lap_list(
     year: int,
     event: str,
@@ -353,6 +431,7 @@ def get_session_lap_list(
         }
 
 
+@_ttl_cached(_tyre_features_cache, is_good=lambda r: not r.get("fallback"))
 def extract_tyre_wear_features(
     year: int,
     event: str,

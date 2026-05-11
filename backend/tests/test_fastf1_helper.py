@@ -6,6 +6,7 @@ import pandas as pd
 from tools.fastf1_helper import (
     SERIES_POINTS,
     _downsample,
+    _reset_caches_for_tests,
     extract_tyre_wear_features,
     get_session_lap_list,
     get_session_telemetry_summary,
@@ -13,6 +14,11 @@ from tools.fastf1_helper import (
 
 
 class FastF1HelperTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # The helpers now cache successful results (#100 slice B).
+        # Wipe between tests so each one sees its own patched fixture.
+        _reset_caches_for_tests()
+
     @patch("tools.fastf1_helper.fastf1.get_session")
     def test_get_session_telemetry_summary_success(self, mock_get_session):
         telemetry_df = pd.DataFrame(

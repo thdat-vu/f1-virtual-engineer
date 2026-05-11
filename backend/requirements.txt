@@ -13,3 +13,4 @@ requests
 slowapi
 httpx
 pyjwt
+cachetools

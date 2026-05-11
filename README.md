@@ -72,6 +72,7 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 * **Rate limiting** — `slowapi` token-bucket on the LLM and telemetry routes; structured 429 envelope with `retry_after_seconds` and a `Retry-After` header.
 * **Fail-closed LLM path** — every Gemini call is wrapped so a missing key, timeout, or malformed response degrades to a deterministic fallback rather than a 500.
 * **In-memory response cache (60 s TTL)** — repeated identical LLM calls are served from a SHA-256-keyed cache, namespaced by call type.
+* **FastF1 result cache + threadpool offload** — schedule/roster/lap-list responses are cached in-process for 24 h, telemetry summaries + tyre features for 1 h. Fallback/empty results are *not* cached, so a transient FastF1 hiccup never sticks. Helper calls now run on the FastAPI threadpool (`asyncio.to_thread`) so a slow FastF1 fetch no longer blocks the event loop for concurrent requests.
 
 ---
 
