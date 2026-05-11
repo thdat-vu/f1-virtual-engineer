@@ -46,6 +46,7 @@ To ensure maintainability and scalability, this project uses a monorepo structur
 * **API Framework:** FastAPI, Pydantic
 * **Telemetry Data:** FastF1
 * **Vector Database:** Supabase / PostgreSQL
+* **Caching:** `cachetools` TTLCache (L1, in-process) + optional Redis (L2, shared across workers)
 * **Deployment:** Docker, Docker Compose
 
 ---
