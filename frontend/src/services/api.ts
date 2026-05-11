@@ -189,10 +189,16 @@ export async function getEventLaps(
   return (await response.json()) as LapListResponse;
 }
 
-export async function getTelemetry(payload: TelemetryQueryRequest): Promise<TelemetryEnvelope> {
+export async function getTelemetry(
+  payload: TelemetryQueryRequest,
+  accessToken?: string,
+): Promise<TelemetryEnvelope> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
   const response = await fetch(`${apiBaseUrl}/telemetry`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
   if (response.status === 429) throw await readRateLimit(response);
@@ -250,4 +256,31 @@ export async function getAnalyzeHistory(
     throw new Error(`Analyze history request failed with status ${response.status}`);
   }
   return (await response.json()) as AnalyzeHistoryResponse;
+}
+
+export interface TelemetryHistoryItem {
+  id: string;
+  year: number;
+  event: string;
+  session_type: string;
+  driver: string;
+  lap_number: number | null;
+  created_at: string;
+}
+
+export interface TelemetryHistoryResponse {
+  items: TelemetryHistoryItem[];
+}
+
+export async function getTelemetryHistory(
+  accessToken: string,
+  limit = 20,
+): Promise<TelemetryHistoryResponse> {
+  const response = await fetch(`${apiBaseUrl}/telemetry/history?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Telemetry history request failed with status ${response.status}`);
+  }
+  return (await response.json()) as TelemetryHistoryResponse;
 }

@@ -11,12 +11,17 @@ from slowapi.util import get_remote_address
 from agents.race_engineer import analyze_query
 from agents.radio_interpreter import interpret_radio
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
-from app.schemas.history import AnalyzeHistoryResponse
+from app.schemas.history import AnalyzeHistoryResponse, TelemetryHistoryResponse
 from app.schemas.radio import RadioRequest, RadioResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from core.auth import get_optional_user_id, get_required_user_id
-from core.persistence import insert_analyze_history, list_analyze_history
+from core.persistence import (
+    insert_analyze_history,
+    insert_telemetry_history,
+    list_analyze_history,
+    list_telemetry_history,
+)
 from tools.fastf1_helper import (
     get_event_drivers,
     get_session_lap_list,
@@ -307,7 +312,11 @@ async def get_session_laps(request: Request, year: int, event: str, session_type
     ),
 )
 @limiter.limit("30/10seconds")
-async def get_telemetry(request: Request, body: TelemetryQueryRequest):
+async def get_telemetry(
+    request: Request,
+    body: TelemetryQueryRequest,
+    user_id: str | None = Depends(get_optional_user_id),
+):
     telemetry = get_session_telemetry_summary(
         year=body.year,
         event=body.event,
@@ -322,7 +331,54 @@ async def get_telemetry(request: Request, body: TelemetryQueryRequest):
             data=summary,
             error=ApiError(code="TELEMETRY_UNAVAILABLE", message=summary.fallback_reason or "Telemetry unavailable."),
         )
+
+    if user_id:
+        # Fire-and-forget so a slow PostgREST call never blocks the response.
+        # The persistence helper is itself fail-closed.
+        asyncio.create_task(
+            insert_telemetry_history(
+                user_id=user_id,
+                year=body.year,
+                event=body.event,
+                session_type=body.session_type,
+                driver=body.driver,
+                lap_number=body.lap_number,
+            )
+        )
+
     return TelemetryResponse(status="success", data=summary, error=None)
+
+
+@app.get(
+    "/telemetry/history",
+    response_model=TelemetryHistoryResponse,
+    tags=["telemetry"],
+    summary="List the signed-in user's recent /telemetry lookups",
+    description=(
+        "Returns the most recent telemetry lookups for the authenticated user, ordered "
+        "newest-first. Requires a valid Supabase JWT — anonymous callers receive 401."
+    ),
+)
+async def get_telemetry_history(
+    request: Request,
+    limit: int = Query(20, ge=1, le=50),
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        items = await list_telemetry_history(user_id=user_id, limit=limit)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to load telemetry history", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "history_unavailable",
+                    "message": "History service is temporarily unavailable.",
+                },
+            },
+        )
+    return {"items": items}
 
 
 if __name__ == "__main__":

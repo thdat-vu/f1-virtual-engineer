@@ -1,14 +1,16 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import type { AnalyzeHistoryItem, AnalyzeResponse, StrategyData } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, StrategyData, TelemetryHistoryItem } from "@/services/api";
 import { TeamIcon } from "@/components/icons/TeamIcons";
 import { RecentAnalyses } from "./RecentAnalyses";
+import { RecentTelemetry } from "./RecentTelemetry";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
   result, strat, isLoading, hasData, session, theme, rateLimitMessage,
   historyRefreshSignal, onSelectHistory,
+  telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
 }: {
   result: AnalyzeResponse | null;
   strat: StrategyData | null | undefined;
@@ -19,6 +21,8 @@ export function StrategyHUD({
   rateLimitMessage?: string | null;
   historyRefreshSignal?: number;
   onSelectHistory?: (item: AnalyzeHistoryItem) => void;
+  telemetryHistoryRefreshSignal?: number;
+  onSelectTelemetryHistory?: (item: TelemetryHistoryItem) => void;
 }) {
   const activeTeam = TEAMS.find((t) => t.id === theme) ?? TEAMS[0];
 
@@ -97,6 +101,10 @@ export function StrategyHUD({
         )}
 
         <RecentAnalyses refreshSignal={historyRefreshSignal} onSelect={onSelectHistory} />
+        <RecentTelemetry
+          refreshSignal={telemetryHistoryRefreshSignal}
+          onSelect={onSelectTelemetryHistory}
+        />
       </div>
     </aside>
   );

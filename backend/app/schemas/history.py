@@ -18,3 +18,17 @@ class AnalyzeHistoryItem(BaseModel):
 
 class AnalyzeHistoryResponse(BaseModel):
     items: list[AnalyzeHistoryItem] = Field(default_factory=list)
+
+
+class TelemetryHistoryItem(BaseModel):
+    id: UUID
+    year: int
+    event: str
+    session_type: str
+    driver: str
+    lap_number: int | None = None
+    created_at: datetime
+
+
+class TelemetryHistoryResponse(BaseModel):
+    items: list[TelemetryHistoryItem] = Field(default_factory=list)

@@ -142,3 +142,69 @@ async def list_analyze_history(*, user_id: str, limit: int = 20) -> list[dict[st
     if not isinstance(payload, list):
         return []
     return payload
+
+
+async def insert_telemetry_history(
+    *,
+    user_id: str,
+    year: int,
+    event: str,
+    session_type: str,
+    driver: str,
+    lap_number: int | None,
+) -> None:
+    """Insert one row into ``telemetry_history``. Fail-closed: never raises."""
+    try:
+        client = await _get_client()
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("Failed to initialise persistence client", exc_info=True)
+        return
+    if client is None:
+        _logger.debug("Supabase persistence not configured; skipping telemetry history insert")
+        return
+    payload = {
+        "user_id": user_id,
+        "year": year,
+        "event": event,
+        "session_type": session_type,
+        "driver": driver,
+        "lap_number": lap_number,
+    }
+    try:
+        response = await client.post(
+            "/telemetry_history",
+            json=payload,
+            headers={"Prefer": "return=minimal"},
+        )
+        if response.status_code >= 400:
+            _logger.warning(
+                "PostgREST telemetry insert failed (status=%s body=%r)",
+                response.status_code,
+                response.text[:300],
+            )
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("PostgREST telemetry insert raised; swallowing", exc_info=True)
+
+
+async def list_telemetry_history(*, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Return the most recent telemetry lookups for ``user_id`` (newest first).
+
+    Raises ``httpx.HTTPError`` on transport error so the caller can return 5xx.
+    """
+    client = await _get_client()
+    if client is None:
+        return []
+    response = await client.get(
+        "/telemetry_history",
+        params={
+            "user_id": f"eq.{user_id}",
+            "order": "created_at.desc",
+            "limit": str(limit),
+            "select": "id,year,event,session_type,driver,lap_number,created_at",
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        return []
+    return payload

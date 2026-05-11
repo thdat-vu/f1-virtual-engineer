@@ -64,7 +64,8 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
 | Google sign-in (Supabase Auth foundation) | ✅ Shipped | `/auth/callback` (frontend) |
 | Per-user `/analyze` history — opt-in persistence by session, list endpoint, Mission Control "Recent" panel | ✅ Shipped | `POST /analyze` (writes when JWT present), `GET /analyze/history` |
-| Per-user telemetry + radio history | ⏳ Planned | tracked in `#94`, `#95` |
+| Per-user `/telemetry` history — opt-in persistence by session, list endpoint, Mission Control "Recently viewed" panel | ✅ Shipped | `POST /telemetry` (writes when JWT present), `GET /telemetry/history` |
+| Per-user radio history + saved/favorited queries | ⏳ Planned | tracked in `#95` (radio) + follow-up issue for saved queries |
 
 ### Reliability features already in production
 

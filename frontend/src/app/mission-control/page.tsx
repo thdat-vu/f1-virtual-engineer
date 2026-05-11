@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo, TelemetryHistoryItem } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
@@ -14,6 +14,7 @@ export default function MissionControlPage() {
   const { theme, setTheme, result, setResult, isLoading, setIsLoading } = useMissionStore();
   const { session: authSession } = useSupabase();
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
+  const [telemetryHistoryRefreshSignal, setTelemetryHistoryRefreshSignal] = useState(0);
 
   const [year, setYear]       = useState<number>(2024);
   const [eventName, setEvent] = useState<string>("");
@@ -95,7 +96,10 @@ export default function MissionControlPage() {
     if (result.telemetry_data?.lap_number === lapNumber) return;
 
     let cancelled = false;
-    getTelemetry({ year, event: eventName, session_type: session, driver, lap_number: lapNumber })
+    getTelemetry(
+      { year, event: eventName, session_type: session, driver, lap_number: lapNumber },
+      authSession?.access_token,
+    )
       .then((res) => {
         if (cancelled || !res.data) return;
         setResult({
@@ -114,22 +118,32 @@ export default function MissionControlPage() {
             sector_boundaries_s: res.data.sector_boundaries_s ?? [],
           },
         });
+        if (authSession && !res.data.fallback) setTelemetryHistoryRefreshSignal((n) => n + 1);
       })
       .catch(() => { /* silent — chart keeps existing series */ })
       .finally(() => { if (!cancelled) setLapOverlayLoading(false); });
     return () => { cancelled = true; };
-  }, [lap, result, eventName, driver, session, year, setResult]);
+  }, [lap, result, eventName, driver, session, year, setResult, authSession]);
 
   // Compare-driver fastest-lap speed trace.
   useEffect(() => {
     if (!compareDriver || !eventName) return;
     let cancelled = false;
-    getTelemetry({ year, event: eventName, session_type: session, driver: compareDriver })
-      .then((res) => { if (!cancelled) setCompareSpeedSeries(res.data?.speed?.series ?? null); })
+    getTelemetry(
+      { year, event: eventName, session_type: session, driver: compareDriver },
+      authSession?.access_token,
+    )
+      .then((res) => {
+        if (cancelled) return;
+        setCompareSpeedSeries(res.data?.speed?.series ?? null);
+        if (authSession && res.data && !res.data.fallback) {
+          setTelemetryHistoryRefreshSignal((n) => n + 1);
+        }
+      })
       .catch(() => { if (!cancelled) setCompareSpeedSeries(null); })
       .finally(() => { if (!cancelled) setCompareLoading(false); });
     return () => { cancelled = true; };
-  }, [compareDriver, year, eventName, session]);
+  }, [compareDriver, year, eventName, session, authSession]);
 
   const canRun = !isLoading && !!eventName && !!driver;
 
@@ -163,6 +177,14 @@ export default function MissionControlPage() {
     if (item.event) setEvent(item.event);
     if (item.session_type) setSession(item.session_type as SessionId);
     if (item.driver) setDriver(item.driver);
+  }, []);
+
+  const handleSelectTelemetryHistory = useCallback((item: TelemetryHistoryItem) => {
+    setYear(item.year);
+    setEvent(item.event);
+    setSession(item.session_type as SessionId);
+    setDriver(item.driver);
+    setLap(item.lap_number != null ? String(item.lap_number) : "");
   }, []);
 
   const tel     = result?.telemetry_data;
@@ -218,6 +240,8 @@ export default function MissionControlPage() {
         session={session} theme={theme} rateLimitMessage={rateLimitMessage}
         historyRefreshSignal={historyRefreshSignal}
         onSelectHistory={handleSelectHistory}
+        telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}
+        onSelectTelemetryHistory={handleSelectTelemetryHistory}
       />
     </div>
   );
