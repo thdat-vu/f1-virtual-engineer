@@ -4,6 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 **Apex-Intelligence** is an end-to-end Agentic AI system designed to act as a virtual Formula 1 race engineer. This system leverages advanced Large Language Models to process real-time telemetry, retrieve historical race data, and provide strategic recommendations such as pit-stop timing (undercut/overcut) and tire degradation analysis.
