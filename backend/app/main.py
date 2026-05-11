@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,6 +29,7 @@ from tools.fastf1_helper import (
     get_session_lap_list,
     get_session_telemetry_summary,
     get_year_schedule,
+    load_prebaked_into_caches,
 )
 
 
@@ -58,7 +60,23 @@ def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRespons
     response.headers["Retry-After"] = str(retry_after)
     return response
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Warm the FastF1 helper caches from any pre-baked snapshots on disk
+    # (slice C of #100). The load is best-effort: a missing/empty prebake
+    # dir is fine, and a corrupt file is logged & skipped rather than
+    # crashing startup.
+    try:
+        loaded = await asyncio.to_thread(load_prebaked_into_caches)
+        if loaded:
+            _logger.info("Loaded %d pre-baked FastF1 entries into cache", loaded)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Prebake warmup failed", exc_info=True)
+    yield
+
+
 app = FastAPI(
+    lifespan=_lifespan,
     title="Apex-Intelligence: Virtual Race Engineer API",
     summary="Telemetry-backed F1 strategy assistant API for mission-control and demo workflows.",
     description=(

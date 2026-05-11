@@ -1,3 +1,7 @@
+import gzip
+import hashlib
+import json
+import logging
 import os
 import threading
 from functools import wraps
@@ -6,6 +10,8 @@ from typing import Any, Callable
 import fastf1
 import pandas as pd
 from cachetools import TTLCache
+
+_logger = logging.getLogger(__name__)
 
 # Setup caching for FastF1
 # Ensure the backend/data directory exists
@@ -47,12 +53,96 @@ _tyre_features_cache: TTLCache = TTLCache(maxsize=256, ttl=3600)
 _cache_lock = threading.Lock()
 
 
+# Pre-bake (slice C of #100):
+# Helper outputs can be persisted to disk so the first user after a restart
+# gets a warm cache hit instead of paying the multi-second FastF1 cold load.
+#
+# - PREBAKE_DIR layout: one subdir per helper name, one gzipped JSON file per
+#   call, named by a short SHA-256 of the args. The file body stores the
+#   original args+kwargs alongside the result so loading can re-derive the
+#   cache key without trusting the filename.
+# - Recording is opt-in via FASTF1_PREBAKE_WRITE=true. Normal serving never
+#   writes to disk — only `scripts/prebake.py` flips the flag.
+# - Loading is always-on: `load_prebaked_into_caches()` runs at startup and
+#   any entries that match the wrapper's key shape get seeded into the
+#   in-memory TTLCache with full TTL.
+#
+# Format note: gzipped JSON, not parquet. The helper outputs are dict
+# envelopes (numbers + short strings + a few 200-element float arrays).
+# Parquet's row-oriented schema is a bad fit for these dict shapes and would
+# pull pyarrow onto the import path. gzip+json keeps each entry under ~5 KB.
+
+PREBAKE_DIR = os.path.join(CACHE_DIR, "prebake")
+_PREBAKE_NAMES: dict[str, TTLCache] = {}  # name -> cache, populated by _ttl_cached
+
+
+def _prebake_recording_enabled() -> bool:
+    return os.environ.get("FASTF1_PREBAKE_WRITE", "").lower() == "true"
+
+
+def _stable_key_digest(args: tuple, kwargs: dict) -> str:
+    payload = json.dumps(
+        {"args": list(args), "kwargs": kwargs}, sort_keys=True, default=str
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _write_prebake_entry(name: str, args: tuple, kwargs: dict, result: Any) -> None:
+    subdir = os.path.join(PREBAKE_DIR, name)
+    try:
+        os.makedirs(subdir, exist_ok=True)
+        digest = _stable_key_digest(args, kwargs)
+        path = os.path.join(subdir, f"{digest}.json.gz")
+        body = {"args": list(args), "kwargs": kwargs, "result": result}
+        with gzip.open(path, "wt", encoding="utf-8") as fh:
+            json.dump(body, fh, default=str)
+    except Exception:  # noqa: BLE001 — persistence must never break a call
+        _logger.warning("Prebake write failed for %s", name, exc_info=True)
+
+
+def load_prebaked_into_caches() -> int:
+    """Seed every TTLCache from the prebake dir. Returns count loaded.
+
+    Called once at app startup. Silently ignores files it can't decode so a
+    single corrupt entry doesn't break warmup. Safe to re-run."""
+    if not os.path.isdir(PREBAKE_DIR):
+        return 0
+    loaded = 0
+    for name, cache in _PREBAKE_NAMES.items():
+        subdir = os.path.join(PREBAKE_DIR, name)
+        if not os.path.isdir(subdir):
+            continue
+        for fname in os.listdir(subdir):
+            if not fname.endswith(".json.gz"):
+                continue
+            path = os.path.join(subdir, fname)
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as fh:
+                    entry = json.load(fh)
+                args = tuple(entry["args"])
+                kwargs = entry["kwargs"]
+                result = entry["result"]
+                key = (args, tuple(sorted(kwargs.items())))
+                with _cache_lock:
+                    cache[key] = result
+                loaded += 1
+            except Exception:  # noqa: BLE001
+                _logger.warning("Skipping unreadable prebake entry %s", path, exc_info=True)
+                continue
+    return loaded
+
+
 def _ttl_cached(
     cache: TTLCache,
     is_good: Callable[[Any], bool],
+    name: str,
 ) -> Callable:
     """Cache only "good" results. Fallback/empty results bypass the cache
-    so transient errors don't get pinned for the full TTL."""
+    so transient errors don't get pinned for the full TTL.
+
+    `name` identifies the cache in the prebake dir layout (slice C of #100)."""
+
+    _PREBAKE_NAMES[name] = cache
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -65,6 +155,8 @@ def _ttl_cached(
             if is_good(result):
                 with _cache_lock:
                     cache[key] = result
+                if _prebake_recording_enabled():
+                    _write_prebake_entry(name, args, kwargs, result)
             return result
 
         wrapper.cache_clear = lambda: _clear_cache(cache)  # type: ignore[attr-defined]
@@ -187,7 +279,7 @@ def _normalize_telemetry(
     return result
 
 
-@_ttl_cached(_schedule_cache, is_good=lambda r: bool(r))
+@_ttl_cached(_schedule_cache, is_good=lambda r: bool(r), name="schedule")
 def get_year_schedule(year: int) -> list[dict[str, Any]]:
     """
     Fetch the event schedule for a specific year and return a list of event dictionaries.
@@ -210,7 +302,7 @@ def get_year_schedule(year: int) -> list[dict[str, Any]]:
         return []
 
 
-@_ttl_cached(_roster_cache, is_good=lambda r: not r.get("fallback"))
+@_ttl_cached(_roster_cache, is_good=lambda r: not r.get("fallback"), name="roster")
 def get_event_drivers(year: int, event: str) -> dict[str, Any]:
     """
     Return the driver roster (3-letter codes) for an event in `year`.
@@ -250,7 +342,7 @@ def get_event_drivers(year: int, event: str) -> dict[str, Any]:
     }
 
 
-@_ttl_cached(_telemetry_cache, is_good=lambda r: not r.get("fallback"))
+@_ttl_cached(_telemetry_cache, is_good=lambda r: not r.get("fallback"), name="telemetry")
 def get_session_telemetry_summary(
     year: int,
     event: str,
@@ -344,7 +436,7 @@ def get_session_telemetry_summary(
         }
 
 
-@_ttl_cached(_lap_list_cache, is_good=lambda r: not r.get("fallback"))
+@_ttl_cached(_lap_list_cache, is_good=lambda r: not r.get("fallback"), name="lap_list")
 def get_session_lap_list(
     year: int,
     event: str,
@@ -431,7 +523,7 @@ def get_session_lap_list(
         }
 
 
-@_ttl_cached(_tyre_features_cache, is_good=lambda r: not r.get("fallback"))
+@_ttl_cached(_tyre_features_cache, is_good=lambda r: not r.get("fallback"), name="tyre_features")
 def extract_tyre_wear_features(
     year: int,
     event: str,

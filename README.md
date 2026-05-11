@@ -73,6 +73,16 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 * **Fail-closed LLM path** — every Gemini call is wrapped so a missing key, timeout, or malformed response degrades to a deterministic fallback rather than a 500.
 * **In-memory response cache (60 s TTL)** — repeated identical LLM calls are served from a SHA-256-keyed cache, namespaced by call type.
 * **FastF1 result cache + threadpool offload** — schedule/roster/lap-list responses are cached in-process for 24 h, telemetry summaries + tyre features for 1 h. Fallback/empty results are *not* cached, so a transient FastF1 hiccup never sticks. Helper calls now run on the FastAPI threadpool (`asyncio.to_thread`) so a slow FastF1 fetch no longer blocks the event loop for concurrent requests.
+* **Pre-baked cache warmup** — `backend/scripts/prebake.py` records helper outputs to `backend/data/prebake/<helper>/*.json.gz`. On startup the FastAPI lifespan hook seeds the in-process TTLCaches from those snapshots, so the first user after a restart hits warm-cache latency for the demo session set instead of paying the multi-second FastF1 cold load.
+
+### Pre-baking the FastF1 cache
+
+```bash
+cd backend
+FASTF1_PREBAKE_WRITE=true python3 -m scripts.prebake
+```
+
+The script iterates over a small `DEMO_SESSIONS` list (currently 2024 Monza R for VER/HAM/LEC) and writes one gzipped-JSON snapshot per helper call into `backend/data/prebake/`. Edit that list to bake additional sessions — each new entry costs one real FastF1 load (~5–30 s) but pays off on every subsequent restart. Snapshots are gitignored by default; commit them only if you want them shipped in the Docker image.
 
 ---
 
