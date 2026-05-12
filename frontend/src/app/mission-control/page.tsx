@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo, TelemetryHistoryItem } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
@@ -16,6 +16,7 @@ export default function MissionControlPage() {
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
   const [telemetryHistoryRefreshSignal, setTelemetryHistoryRefreshSignal] = useState(0);
   const [radioHistoryRefreshSignal] = useState(0);
+  const [savedQueries, setSavedQueries] = useState<SavedQueryItem[]>([]);
 
   const [year, setYear]       = useState<number>(2024);
   const [eventName, setEvent] = useState<string>("");
@@ -188,6 +189,24 @@ export default function MissionControlPage() {
     setLap(item.lap_number != null ? String(item.lap_number) : "");
   }, []);
 
+  const handleSelectSaved = useCallback((item: SavedQueryItem) => {
+    const p = item.payload as Record<string, unknown>;
+    if (item.kind === "analyze") {
+      const info = (p.session_info as Record<string, unknown> | undefined) ?? {};
+      if (typeof info.year === "number") setYear(info.year);
+      if (typeof info.event === "string") setEvent(info.event);
+      if (typeof info.session_type === "string") setSession(info.session_type as SessionId);
+      if (typeof p.driver === "string") setDriver(p.driver);
+    } else if (item.kind === "telemetry") {
+      if (typeof p.year === "number") setYear(p.year);
+      if (typeof p.event === "string") setEvent(p.event);
+      if (typeof p.session_type === "string") setSession(p.session_type as SessionId);
+      if (typeof p.driver === "string") setDriver(p.driver);
+      if (typeof p.lap_number === "number") setLap(String(p.lap_number));
+      else setLap("");
+    }
+  }, []);
+
   const tel     = result?.telemetry_data;
   const strat   = result?.strategy_data;
   const hasData = !isLoading && !!result;
@@ -226,6 +245,7 @@ export default function MissionControlPage() {
           compareLoading={compareLoading}
           setCompareSpeedSeries={setCompareSpeedSeries} setCompareLoading={setCompareLoading}
           result={result} isLoading={isLoading} canRun={canRun} onAnalyze={handleAnalyze}
+          savedQueries={savedQueries} onSavedQueriesChange={setSavedQueries}
         />
 
         <TelemetryChartGrid
@@ -244,6 +264,9 @@ export default function MissionControlPage() {
         telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}
         onSelectTelemetryHistory={handleSelectTelemetryHistory}
         radioHistoryRefreshSignal={radioHistoryRefreshSignal}
+        savedQueries={savedQueries}
+        onSavedQueriesChange={setSavedQueries}
+        onSelectSaved={handleSelectSaved}
       />
     </div>
   );

@@ -315,3 +315,61 @@ export async function getRadioHistory(
   }
   return (await response.json()) as RadioHistoryResponse;
 }
+
+export type SavedQueryKind = "analyze" | "telemetry";
+
+export interface SavedQueryItem {
+  id: string;
+  kind: SavedQueryKind;
+  payload: Record<string, unknown>;
+  label: string | null;
+  created_at: string;
+}
+
+export interface SavedQueryListResponse {
+  items: SavedQueryItem[];
+}
+
+export async function getSavedQueries(
+  accessToken: string,
+  limit = 50,
+): Promise<SavedQueryListResponse> {
+  const response = await fetch(`${apiBaseUrl}/saved-queries?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Saved queries request failed with status ${response.status}`);
+  }
+  return (await response.json()) as SavedQueryListResponse;
+}
+
+export async function createSavedQuery(
+  accessToken: string,
+  body: { kind: SavedQueryKind; payload: Record<string, unknown>; label?: string | null },
+): Promise<SavedQueryItem> {
+  const response = await fetch(`${apiBaseUrl}/saved-queries`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Save query request failed with status ${response.status}`);
+  }
+  return (await response.json()) as SavedQueryItem;
+}
+
+export async function deleteSavedQuery(
+  accessToken: string,
+  id: string,
+): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/saved-queries/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`Delete saved query failed with status ${response.status}`);
+  }
+}

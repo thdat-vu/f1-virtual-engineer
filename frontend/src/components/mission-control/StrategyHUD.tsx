@@ -1,11 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import type { AnalyzeHistoryItem, AnalyzeResponse, StrategyData, TelemetryHistoryItem } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, SavedQueryItem, StrategyData, TelemetryHistoryItem } from "@/services/api";
 import { TeamIcon } from "@/components/icons/TeamIcons";
 import { RecentAnalyses } from "./RecentAnalyses";
 import { RecentTelemetry } from "./RecentTelemetry";
 import { RadioLog } from "./RadioLog";
+import { SavedQueriesPanel } from "./SavedQueriesPanel";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
@@ -13,6 +14,7 @@ export function StrategyHUD({
   historyRefreshSignal, onSelectHistory,
   telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
   radioHistoryRefreshSignal,
+  savedQueries, onSavedQueriesChange, onSelectSaved,
 }: {
   result: AnalyzeResponse | null;
   strat: StrategyData | null | undefined;
@@ -26,6 +28,9 @@ export function StrategyHUD({
   telemetryHistoryRefreshSignal?: number;
   onSelectTelemetryHistory?: (item: TelemetryHistoryItem) => void;
   radioHistoryRefreshSignal?: number;
+  savedQueries: SavedQueryItem[];
+  onSavedQueriesChange: (items: SavedQueryItem[]) => void;
+  onSelectSaved?: (item: SavedQueryItem) => void;
 }) {
   const activeTeam = TEAMS.find((t) => t.id === theme) ?? TEAMS[0];
 
@@ -109,6 +114,11 @@ export function StrategyHUD({
           onSelect={onSelectTelemetryHistory}
         />
         <RadioLog refreshSignal={radioHistoryRefreshSignal} />
+        <SavedQueriesPanel
+          items={savedQueries}
+          onItemsChange={onSavedQueriesChange}
+          onSelect={onSelectSaved}
+        />
       </div>
     </aside>
   );

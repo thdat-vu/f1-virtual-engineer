@@ -1,9 +1,10 @@
 "use client";
 
-import type { AnalyzeResponse, EventInfo, LapInfo } from "@/services/api";
+import type { AnalyzeResponse, EventInfo, LapInfo, SavedQueryItem } from "@/services/api";
 import { SESSIONS, YEARS, type SessionId } from "./constants";
 import { Select, VDivider } from "./primitives";
 import { formatLapTime } from "./TelemetryChart";
+import { StarButton } from "./StarButton";
 
 export function SelectorBar({
   year, setYear,
@@ -16,6 +17,7 @@ export function SelectorBar({
   compareDriver, setCompareDriver, compareLoading,
   setCompareSpeedSeries, setCompareLoading,
   result, isLoading, canRun, onAnalyze,
+  savedQueries, onSavedQueriesChange,
 }: {
   year: number;
   setYear: (n: number) => void;
@@ -52,6 +54,8 @@ export function SelectorBar({
   isLoading: boolean;
   canRun: boolean;
   onAnalyze: () => void;
+  savedQueries: SavedQueryItem[];
+  onSavedQueriesChange: (items: SavedQueryItem[]) => void;
 }) {
   const eventOptions   = events.map((e) => ({ id: e.name, label: e.name }));
   const sessionOptions = SESSIONS.map((s) => ({ id: s.id, label: s.label }));
@@ -180,6 +184,18 @@ export function SelectorBar({
       />
 
       <div className="flex-1" />
+
+      <StarButton
+        kind="analyze"
+        payload={{
+          query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
+          driver,
+          session_info: { event: eventName, year, session_type: session },
+        }}
+        canSave={canRun}
+        savedQueries={savedQueries}
+        onChange={onSavedQueriesChange}
+      />
 
       <button
         onClick={onAnalyze}

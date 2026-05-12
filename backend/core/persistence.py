@@ -278,3 +278,77 @@ async def list_radio_history(
     if not isinstance(payload, list):
         return []
     return payload
+
+
+async def insert_saved_query(
+    *,
+    user_id: str,
+    kind: str,
+    payload: dict[str, Any],
+    label: str | None,
+) -> dict[str, Any] | None:
+    """Insert one row into ``saved_queries`` and return it. Raises on transport error."""
+    client = await _get_client()
+    if client is None:
+        return None
+    body = {
+        "user_id": user_id,
+        "kind": kind,
+        "payload": payload,
+        "label": label,
+    }
+    response = await client.post(
+        "/saved_queries",
+        json=body,
+        headers={"Prefer": "return=representation"},
+    )
+    response.raise_for_status()
+    rows = response.json()
+    if isinstance(rows, list) and rows:
+        return rows[0]
+    if isinstance(rows, dict):
+        return rows
+    return None
+
+
+async def list_saved_queries(*, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Return saved queries for ``user_id`` newest-first. Raises on transport error."""
+    client = await _get_client()
+    if client is None:
+        return []
+    response = await client.get(
+        "/saved_queries",
+        params={
+            "user_id": f"eq.{user_id}",
+            "order": "created_at.desc",
+            "limit": str(limit),
+            "select": "id,kind,payload,label,created_at",
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        return []
+    return payload
+
+
+async def delete_saved_query(*, user_id: str, query_id: str) -> bool:
+    """Delete a saved query if it belongs to ``user_id``. Returns True when a row
+    was deleted. Raises ``httpx.HTTPError`` on transport error so the caller can
+    distinguish "not yours" (False) from "db down" (5xx)."""
+    client = await _get_client()
+    if client is None:
+        return False
+    response = await client.delete(
+        "/saved_queries",
+        params={
+            "id": f"eq.{query_id}",
+            "user_id": f"eq.{user_id}",
+        },
+        headers={"Prefer": "return=representation"},
+    )
+    response.raise_for_status()
+    rows = response.json()
+    if isinstance(rows, list):
+        return len(rows) > 0
+    return False

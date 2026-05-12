@@ -14,15 +14,23 @@ from agents.radio_interpreter import interpret_radio
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
 from app.schemas.history import AnalyzeHistoryResponse, RadioHistoryResponse, TelemetryHistoryResponse
 from app.schemas.radio import RadioRequest, RadioResponse
+from app.schemas.saved_queries import (
+    SavedQueryCreateRequest,
+    SavedQueryItem,
+    SavedQueryListResponse,
+)
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from core.auth import get_optional_user_id, get_required_user_id
 from core.persistence import (
+    delete_saved_query,
     insert_analyze_history,
     insert_radio_history,
+    insert_saved_query,
     insert_telemetry_history,
     list_analyze_history,
     list_radio_history,
+    list_saved_queries,
     list_telemetry_history,
 )
 from core.timing import TimingMiddleware, snapshot_metrics
@@ -477,6 +485,127 @@ async def get_telemetry_history(
             },
         )
     return {"items": items}
+
+
+@app.post(
+    "/saved-queries",
+    response_model=SavedQueryItem,
+    status_code=201,
+    tags=["analysis"],
+    summary="Star a query so it survives past the rolling history window",
+    description=(
+        "Persists an analyze or telemetry request body under the signed-in user. "
+        "Returns the created row so the frontend can render the star as 'already saved'."
+    ),
+)
+async def create_saved_query(
+    request: Request,
+    body: SavedQueryCreateRequest,
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        row = await insert_saved_query(
+            user_id=user_id,
+            kind=body.kind,
+            payload=body.payload,
+            label=body.label,
+        )
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to insert saved query", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "saved_queries_unavailable",
+                    "message": "Saved queries service is temporarily unavailable.",
+                },
+            },
+        )
+    if row is None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "saved_queries_unavailable",
+                    "message": "Saved queries service is not configured.",
+                },
+            },
+        )
+    return row
+
+
+@app.get(
+    "/saved-queries",
+    response_model=SavedQueryListResponse,
+    tags=["analysis"],
+    summary="List the signed-in user's saved queries",
+)
+async def get_saved_queries(
+    request: Request,
+    limit: int = Query(50, ge=1, le=100),
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        items = await list_saved_queries(user_id=user_id, limit=limit)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to load saved queries", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "saved_queries_unavailable",
+                    "message": "Saved queries service is temporarily unavailable.",
+                },
+            },
+        )
+    return {"items": items}
+
+
+@app.delete(
+    "/saved-queries/{query_id}",
+    status_code=204,
+    tags=["analysis"],
+    summary="Delete a saved query owned by the signed-in user",
+    description=(
+        "Returns 204 on success. Returns 404 when the row does not exist or "
+        "belongs to a different user — the latter mapped to 404 to avoid "
+        "leaking id existence to non-owners."
+    ),
+)
+async def remove_saved_query(
+    request: Request,
+    query_id: str,
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        deleted = await delete_saved_query(user_id=user_id, query_id=query_id)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to delete saved query", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "saved_queries_unavailable",
+                    "message": "Saved queries service is temporarily unavailable.",
+                },
+            },
+        )
+    if not deleted:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "not_found",
+                    "message": "Saved query not found.",
+                },
+            },
+        )
+    return JSONResponse(status_code=204, content=None)
 
 
 if __name__ == "__main__":
