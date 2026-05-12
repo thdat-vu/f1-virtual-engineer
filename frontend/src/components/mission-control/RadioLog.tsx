@@ -8,12 +8,15 @@ import { formatRelativeTime } from "@/lib/relative-time";
 
 type Status = "idle" | "loading" | "loaded" | "error";
 
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: "text-red-400",
-  high: "text-orange-400",
-  medium: "text-yellow-400",
-  low: "text-foreground-dim",
-  none: "text-foreground-faint",
+const SEVERITY_STYLE: Record<string, { bar: string; pill: string }> = {
+  high:   { bar: "bg-red-500",    pill: "bg-red-500/20 text-red-300 border-red-500/40" },
+  medium: { bar: "bg-amber-400",  pill: "bg-amber-400/15 text-amber-300 border-amber-400/40" },
+  low:    { bar: "bg-accent",     pill: "bg-accent-dim text-accent border-accent/40" },
+};
+
+const DEFAULT_STYLE = {
+  bar: "bg-border",
+  pill: "bg-surface text-foreground-dim border-border",
 };
 
 export function RadioLog({ refreshSignal = 0 }: { refreshSignal?: number }) {
@@ -67,7 +70,10 @@ function RadioLogPanel({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <p className="label">Radio Log</p>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-1.5 w-1.5 bg-accent" aria-hidden />
+          <p className="label text-accent">Radio Log</p>
+        </div>
         <span className="readout text-[length:var(--text-readout)] text-foreground-faint">
           {open ? "−" : "+"}
         </span>
@@ -101,36 +107,43 @@ function RadioLogPanel({
             </p>
           )}
 
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="border border-border px-2 py-1.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="readout text-[length:var(--text-readout)] font-bold text-foreground uppercase">
-                  {item.classification}
-                </span>
+          {items.map((item) => {
+            const style = SEVERITY_STYLE[item.severity] ?? DEFAULT_STYLE;
+            return (
+              <div
+                key={item.id}
+                className="relative border border-border bg-accent-dim/40 pl-2.5 pr-2 py-1.5 transition-colors duration-[var(--dur-fast)] hover:border-accent"
+              >
                 <span
-                  className={`readout text-[0.55rem] uppercase tracking-wide ${SEVERITY_COLOR[item.severity] ?? "text-foreground-dim"}`}
-                >
-                  {item.severity}
-                </span>
+                  className={`absolute left-0 top-0 h-full w-0.5 ${style.bar}`}
+                  aria-hidden
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="readout text-[length:var(--text-readout)] font-bold uppercase tracking-wide text-accent">
+                    {item.classification.replace("_", " ")}
+                  </span>
+                  <span
+                    className={`readout inline-block border px-1.5 py-[1px] text-[0.5rem] uppercase tracking-[0.1em] ${style.pill}`}
+                  >
+                    {item.severity}
+                  </span>
+                </div>
+                {item.trigger_phrase && (
+                  <p className="readout mt-1 truncate text-[0.6rem] italic text-foreground-dim">
+                    &ldquo;{item.trigger_phrase}&rdquo;
+                  </p>
+                )}
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="readout truncate text-[0.55rem] uppercase tracking-wide text-foreground-dim">
+                    {item.driver ?? "—"}
+                  </span>
+                  <span className="readout shrink-0 text-[0.55rem] text-foreground-faint">
+                    {formatRelativeTime(item.created_at)}
+                  </span>
+                </div>
               </div>
-              {item.trigger_phrase && (
-                <p className="readout mt-0.5 truncate text-[0.55rem] text-foreground-dim">
-                  &ldquo;{item.trigger_phrase}&rdquo;
-                </p>
-              )}
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="readout truncate text-[0.55rem] uppercase tracking-wide text-foreground-faint">
-                  {item.driver ?? "—"}
-                </span>
-                <span className="readout shrink-0 text-[0.55rem] text-foreground-faint">
-                  {formatRelativeTime(item.created_at)}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
