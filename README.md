@@ -17,7 +17,7 @@ The project follows a robust, production-ready agentic workflow separating busin
 
 * **Frontend (Next.js Dashboard):** A real-time interface displaying telemetry charts and the agent's reasoning traces.
 * **Backend API (FastAPI):** Chosen because FastAPI is fast to develop, supports async, has strong typing via Pydantic, and generates OpenAPI docs[cite: 303].
-* **Agent Orchestrator (LangGraph):** Manages multi-agent coordination. It models agent behavior as a graph with nodes (steps) and edges (transitions), which is easier to reason about than implicit loops[cite: 88].
+* **Agent Orchestrator (LangGraph):** Manages multi-agent coordination. It models agent behavior as a graph with nodes (steps) and edges (transitions), which is easier to reason about than implicit loops.
 * **Data Connectors:** Custom Python wrappers for the `FastF1` library to extract speed, throttle, brake, and tire data.
 * **RAG System:** A vector database (Supabase/ChromaDB) storing FIA regulations and historical race strategies.
 
