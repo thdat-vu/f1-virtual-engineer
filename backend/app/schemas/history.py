@@ -32,3 +32,18 @@ class TelemetryHistoryItem(BaseModel):
 
 class TelemetryHistoryResponse(BaseModel):
     items: list[TelemetryHistoryItem] = Field(default_factory=list)
+
+
+class RadioHistoryItem(BaseModel):
+    id: UUID
+    transcript: str
+    driver: str | None = None
+    classification: str
+    severity: str
+    trigger_phrase: str | None = None
+    fallback: bool
+    created_at: datetime
+
+
+class RadioHistoryResponse(BaseModel):
+    items: list[RadioHistoryItem] = Field(default_factory=list)

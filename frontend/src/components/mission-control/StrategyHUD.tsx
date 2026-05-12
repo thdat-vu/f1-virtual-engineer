@@ -5,12 +5,14 @@ import type { AnalyzeHistoryItem, AnalyzeResponse, StrategyData, TelemetryHistor
 import { TeamIcon } from "@/components/icons/TeamIcons";
 import { RecentAnalyses } from "./RecentAnalyses";
 import { RecentTelemetry } from "./RecentTelemetry";
+import { RadioLog } from "./RadioLog";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
   result, strat, isLoading, hasData, session, theme, rateLimitMessage,
   historyRefreshSignal, onSelectHistory,
   telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
+  radioHistoryRefreshSignal,
 }: {
   result: AnalyzeResponse | null;
   strat: StrategyData | null | undefined;
@@ -23,6 +25,7 @@ export function StrategyHUD({
   onSelectHistory?: (item: AnalyzeHistoryItem) => void;
   telemetryHistoryRefreshSignal?: number;
   onSelectTelemetryHistory?: (item: TelemetryHistoryItem) => void;
+  radioHistoryRefreshSignal?: number;
 }) {
   const activeTeam = TEAMS.find((t) => t.id === theme) ?? TEAMS[0];
 
@@ -105,6 +108,7 @@ export function StrategyHUD({
           refreshSignal={telemetryHistoryRefreshSignal}
           onSelect={onSelectTelemetryHistory}
         />
+        <RadioLog refreshSignal={radioHistoryRefreshSignal} />
       </div>
     </aside>
   );

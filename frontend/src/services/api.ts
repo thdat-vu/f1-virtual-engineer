@@ -284,3 +284,34 @@ export async function getTelemetryHistory(
   }
   return (await response.json()) as TelemetryHistoryResponse;
 }
+
+export interface RadioHistoryItem {
+  id: string;
+  transcript: string;
+  driver: string | null;
+  classification: string;
+  severity: string;
+  trigger_phrase: string | null;
+  fallback: boolean;
+  created_at: string;
+}
+
+export interface RadioHistoryResponse {
+  items: RadioHistoryItem[];
+}
+
+export async function getRadioHistory(
+  accessToken: string,
+  limit = 20,
+  driver?: string,
+): Promise<RadioHistoryResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (driver) params.set("driver", driver);
+  const response = await fetch(`${apiBaseUrl}/radio/history?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Radio history request failed with status ${response.status}`);
+  }
+  return (await response.json()) as RadioHistoryResponse;
+}

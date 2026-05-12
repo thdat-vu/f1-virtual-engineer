@@ -15,6 +15,7 @@ export default function MissionControlPage() {
   const { session: authSession } = useSupabase();
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
   const [telemetryHistoryRefreshSignal, setTelemetryHistoryRefreshSignal] = useState(0);
+  const [radioHistoryRefreshSignal] = useState(0);
 
   const [year, setYear]       = useState<number>(2024);
   const [eventName, setEvent] = useState<string>("");
@@ -242,6 +243,7 @@ export default function MissionControlPage() {
         onSelectHistory={handleSelectHistory}
         telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}
         onSelectTelemetryHistory={handleSelectTelemetryHistory}
+        radioHistoryRefreshSignal={radioHistoryRefreshSignal}
       />
     </div>
   );

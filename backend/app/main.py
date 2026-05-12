@@ -12,15 +12,17 @@ from slowapi.util import get_remote_address
 from agents.race_engineer import analyze_query
 from agents.radio_interpreter import interpret_radio
 from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
-from app.schemas.history import AnalyzeHistoryResponse, TelemetryHistoryResponse
+from app.schemas.history import AnalyzeHistoryResponse, RadioHistoryResponse, TelemetryHistoryResponse
 from app.schemas.radio import RadioRequest, RadioResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from core.auth import get_optional_user_id, get_required_user_id
 from core.persistence import (
     insert_analyze_history,
+    insert_radio_history,
     insert_telemetry_history,
     list_analyze_history,
+    list_radio_history,
     list_telemetry_history,
 )
 from core.timing import TimingMiddleware, snapshot_metrics
@@ -302,8 +304,24 @@ async def get_analyze_history(
     ),
 )
 @limiter.limit("3/10seconds")
-async def analyze_radio(request: Request, body: RadioRequest):
+async def analyze_radio(
+    request: Request,
+    body: RadioRequest,
+    user_id: str | None = Depends(get_optional_user_id),
+):
     result = interpret_radio(transcript=body.transcript, driver=body.driver)
+    if user_id:
+        asyncio.create_task(
+            insert_radio_history(
+                user_id=user_id,
+                transcript=body.transcript,
+                driver=body.driver,
+                classification=result["classification"],
+                severity=result["severity"],
+                trigger_phrase=result.get("trigger_phrase"),
+                fallback=result["fallback"],
+            )
+        )
     return RadioResponse(
         status="error" if result["fallback"] else "success",
         classification=result["classification"],
@@ -312,6 +330,39 @@ async def analyze_radio(request: Request, body: RadioRequest):
         fallback=result["fallback"],
         fallback_reason=result.get("fallback_reason"),
     )
+
+
+@app.get(
+    "/radio/history",
+    response_model=RadioHistoryResponse,
+    tags=["analysis"],
+    summary="List the signed-in user's recent radio classifications",
+    description=(
+        "Returns the most recent radio classifications for the authenticated user, ordered "
+        "newest-first. Optionally filtered by driver code. Requires a valid Supabase JWT."
+    ),
+)
+async def get_radio_history(
+    request: Request,
+    limit: int = Query(20, ge=1, le=50),
+    driver: str | None = Query(None, description="Filter by 3-letter driver code, e.g. VER"),
+    user_id: str = Depends(get_required_user_id),
+):
+    try:
+        items = await list_radio_history(user_id=user_id, limit=limit, driver=driver)
+    except Exception:  # noqa: BLE001
+        _logger.warning("Failed to load radio history", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "error": {
+                    "code": "history_unavailable",
+                    "message": "History service is temporarily unavailable.",
+                },
+            },
+        )
+    return {"items": items}
 
 
 @app.get(

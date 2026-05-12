@@ -208,3 +208,73 @@ async def list_telemetry_history(*, user_id: str, limit: int = 20) -> list[dict[
     if not isinstance(payload, list):
         return []
     return payload
+
+
+async def insert_radio_history(
+    *,
+    user_id: str,
+    transcript: str,
+    driver: str | None,
+    classification: str,
+    severity: str,
+    trigger_phrase: str | None,
+    fallback: bool,
+) -> None:
+    """Insert one row into ``radio_history``. Fail-closed: never raises."""
+    try:
+        client = await _get_client()
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("Failed to initialise persistence client", exc_info=True)
+        return
+    if client is None:
+        _logger.debug("Supabase persistence not configured; skipping radio history insert")
+        return
+    payload = {
+        "user_id": user_id,
+        "transcript": transcript,
+        "driver": driver,
+        "classification": classification,
+        "severity": severity,
+        "trigger_phrase": trigger_phrase,
+        "fallback": fallback,
+    }
+    try:
+        response = await client.post(
+            "/radio_history",
+            json=payload,
+            headers={"Prefer": "return=minimal"},
+        )
+        if response.status_code >= 400:
+            _logger.warning(
+                "PostgREST radio insert failed (status=%s body=%r)",
+                response.status_code,
+                response.text[:300],
+            )
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("PostgREST radio insert raised; swallowing", exc_info=True)
+
+
+async def list_radio_history(
+    *, user_id: str, limit: int = 20, driver: str | None = None
+) -> list[dict[str, Any]]:
+    """Return the most recent radio classifications for ``user_id`` (newest first).
+
+    Optionally filtered by ``driver``. Raises ``httpx.HTTPError`` on transport error.
+    """
+    client = await _get_client()
+    if client is None:
+        return []
+    params: dict[str, str] = {
+        "user_id": f"eq.{user_id}",
+        "order": "created_at.desc",
+        "limit": str(limit),
+        "select": "id,transcript,driver,classification,severity,trigger_phrase,fallback,created_at",
+    }
+    if driver:
+        params["driver"] = f"eq.{driver}"
+    response = await client.get("/radio_history", params=params)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        return []
+    return payload
