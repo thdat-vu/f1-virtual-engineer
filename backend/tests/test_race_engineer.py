@@ -77,6 +77,7 @@ class RaceEngineerTests(unittest.TestCase):
         self.assertFalse(result["telemetry_data"]["fallback"])
         self.assertEqual(result["execution"]["termination_reason"], "completed")
         self.assertEqual(result["execution"]["step_limit"], 6)
+        self.assertIsInstance(result["execution"]["trace"], list)
         self.assertEqual(result["retry"]["count"], 0)
 
     @patch("agents.race_engineer.get_session_telemetry_summary")

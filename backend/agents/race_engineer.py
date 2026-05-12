@@ -7,8 +7,12 @@ from typing import Any, TypedDict
 from langgraph.graph import END, StateGraph
 
 from core.llm import generate_rationale
-from tools.fastf1_helper import get_session_telemetry_summary
-from tools.strategy_helper import strategy_analyzer
+from core.trace import start_trace, get_trace, traced
+from tools.fastf1_helper import get_session_telemetry_summary as _raw_get_telemetry
+from tools.strategy_helper import strategy_analyzer as _raw_strategy_analyzer
+
+get_session_telemetry_summary = traced("telemetry")(_raw_get_telemetry)
+strategy_analyzer = traced("strategy")(_raw_strategy_analyzer)
 
 DEFAULT_EVENT = "Japanese Grand Prix"
 DEFAULT_SESSION_TYPE = "R"
@@ -492,6 +496,7 @@ def analyze_query(
 
     termination_reason = "completed"
     start_time = monotonic()
+    start_trace()
     try:
         result = app_graph.invoke(
             {
@@ -529,6 +534,7 @@ def analyze_query(
                 "duration_limit_seconds": MAX_GRAPH_DURATION_SECONDS,
                 "duration_ms": elapsed_ms,
                 "termination_reason": termination_reason,
+                "trace": get_trace(),
             },
             "retry": {
                 "count": 0,
@@ -582,6 +588,7 @@ def analyze_query(
             "duration_limit_seconds": MAX_GRAPH_DURATION_SECONDS,
             "duration_ms": elapsed_ms,
             "termination_reason": termination_reason,
+            "trace": get_trace(),
         },
         "retry": {
             "count": result.get("retry_count", 0),

@@ -53,11 +53,18 @@ class AnalyzeMemory(BaseModel):
     last_driver: str | None = None
 
 
+class TraceEntry(BaseModel):
+    tool: str
+    duration_ms: float
+    status: Literal["ok", "error"] = "ok"
+
+
 class AnalyzeExecution(BaseModel):
     step_limit: int
     duration_limit_seconds: float
     duration_ms: float
     termination_reason: str
+    trace: list[TraceEntry] = Field(default_factory=list)
 
 
 class AnalyzeRetry(BaseModel):

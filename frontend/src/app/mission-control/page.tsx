@@ -253,7 +253,7 @@ export default function MissionControlPage() {
           compareDriver={compareDriver} compareSpeedSeries={compareSpeedSeries}
         />
 
-        <MissionFooter tel={tel} strat={strat} hasData={hasData} />
+        <MissionFooter tel={tel} strat={strat} hasData={hasData} execution={result?.execution} />
       </div>
 
       <StrategyHUD

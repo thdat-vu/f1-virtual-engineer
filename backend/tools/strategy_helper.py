@@ -1,6 +1,9 @@
 from typing import Any
 
-from tools.fastf1_helper import extract_tyre_wear_features
+from core.trace import traced
+from tools.fastf1_helper import extract_tyre_wear_features as _raw_extract_tyre_wear_features
+
+extract_tyre_wear_features = traced("tyre_wear")(_raw_extract_tyre_wear_features)
 
 
 def predict_tyre_wear(

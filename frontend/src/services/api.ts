@@ -52,7 +52,22 @@ export interface AnalyzeResponse {
   };
   strategy_data?: StrategyData | null;
   rationale_source?: "llm" | "template";
+  execution?: AnalyzeExecution | null;
   error?: string | null;
+}
+
+export interface TraceEntry {
+  tool: string;
+  duration_ms: number;
+  status: "ok" | "error";
+}
+
+export interface AnalyzeExecution {
+  step_limit: number;
+  duration_limit_seconds: number;
+  duration_ms: number;
+  termination_reason: string;
+  trace: TraceEntry[];
 }
 
 export interface EventInfo {
