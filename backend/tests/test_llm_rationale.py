@@ -10,11 +10,15 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from agents import race_engineer
-from agents.race_engineer import format_response_node, reset_memory_store
+from agents.race_engineer import (
+    _build_llm_context,
+    format_response_node,
+    reset_memory_store,
+)
 from tests._helpers import force_template_rationale
 
 
-def _telemetry_state(error: str | None = None) -> dict:
+def _telemetry_state(error: str | None = None, citations: list | None = None) -> dict:
     return {
         "query": "show ham telemetry",
         "intent": {"driver": "HAM", "year": 2023, "session_type": "R", "intent_type": "telemetry", "event": "Japanese Grand Prix"},
@@ -36,6 +40,7 @@ def _telemetry_state(error: str | None = None) -> dict:
         "retry_metadata": {},
         "overrides": {},
         "rationale_source": "template",
+        "citations": citations or [],
     }
 
 
@@ -81,6 +86,42 @@ class FormatResponseLLMBranchTests(unittest.TestCase):
         spy.assert_not_called()
         self.assertEqual(result["response_text"], "Telemetry unavailable: no laps")
         self.assertEqual(result["rationale_source"], "template")
+
+
+class BuildLLMContextTests(unittest.TestCase):
+    def test_context_carries_citations_and_strips_score(self):
+        state = _telemetry_state(citations=[
+            {
+                "id": "drs-activation",
+                "title": "Drag Reduction System (DRS) activation rules",
+                "source": "FIA Sporting Regs 2024, Article 22.1",
+                "section": "22.1 — Drag Reduction System",
+                "topics": ["drs", "overtaking"],
+                "snippet": "DRS may only be activated within one second…",
+                "score": 3.184,
+            },
+        ])
+        context = _build_llm_context(state)
+        self.assertEqual(len(context["citations"]), 1)
+        citation = context["citations"][0]
+        self.assertEqual(citation["id"], "drs-activation")
+        self.assertNotIn("score", citation)
+        self.assertIn("title", citation)
+        self.assertIn("snippet", citation)
+
+    def test_context_defaults_citations_to_empty_list(self):
+        state = _telemetry_state()
+        context = _build_llm_context(state)
+        self.assertEqual(context["citations"], [])
+
+    def test_llm_cache_key_differs_when_citations_differ(self):
+        from core.llm import _context_key
+
+        base = _build_llm_context(_telemetry_state())
+        with_citation = _build_llm_context(_telemetry_state(citations=[
+            {"id": "drs-activation", "title": "DRS", "section": "22.1", "topics": [], "snippet": "...", "source": "FIA"},
+        ]))
+        self.assertNotEqual(_context_key(base), _context_key(with_citation))
 
 
 if __name__ == "__main__":

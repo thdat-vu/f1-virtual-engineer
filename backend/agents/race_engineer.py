@@ -138,6 +138,7 @@ class AgentState(TypedDict):
     retry_metadata: dict[str, Any]
     overrides: dict[str, Any]
     rationale_source: str  # "llm" or "template"
+    citations: list[dict[str, Any]]
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
@@ -403,10 +404,19 @@ def _is_short_factual(state: AgentState) -> bool:
 
 def _build_llm_context(state: AgentState) -> dict[str, Any]:
     """Trim the agent state down to the facts the LLM is allowed to mention."""
+    citations = state.get("citations") or []
+    # Strip score before sending to the LLM — it's a retrieval-internal signal,
+    # and including it tempts the model to mention numeric "confidence" values
+    # the user never asked for.
+    trimmed_citations = [
+        {k: v for k, v in c.items() if k != "score"}
+        for c in citations
+    ]
     return {
         "intent": state.get("intent") or {},
         "telemetry_data": state.get("telemetry_data") or {},
         "strategy_data": state.get("strategy_data") or {},
+        "citations": trimmed_citations,
     }
 
 
@@ -527,6 +537,7 @@ def analyze_query(
                 "retry_metadata": {},
                 "overrides": overrides,
                 "rationale_source": "template",
+                "citations": citations,
             },
             config={"recursion_limit": MAX_GRAPH_STEPS},
         )
