@@ -76,134 +76,136 @@ export function SelectorBar({
 
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-5 py-2.5">
-      <Select<string>
-        value={String(year)}
-        onChange={(v) => {
-          setYear(Number(v));
-          setDriver("");
-          setFetchedDrivers(null);
-          setDriversFallback(false);
-          setLap("");
-          setLaps([]);
-          setFastestLapNumber(null);
-          setCompareDriver("");
-          setCompareSpeedSeries(null);
-        }}
-        options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
-        placeholder="Year"
-      />
-      <VDivider />
-
-      <Select<string>
-        value={eventName}
-        onChange={(v) => {
-          setEvent(v);
-          setDriver("");
-          setFetchedDrivers(null);
-          setDriversFallback(false);
-          setDriversLoading(!!v);
-          setLap("");
-          setLaps([]);
-          setFastestLapNumber(null);
-          setCompareDriver("");
-          setCompareSpeedSeries(null);
-        }}
-        options={eventOptions}
-        loading={eventsLoading}
-        placeholder="Grand Prix"
-      />
-      <VDivider />
-
-      <Select<SessionId>
-        value={session}
-        onChange={(v) => {
-          setSession(v);
-          setLap("");
-          setLaps([]);
-          setFastestLapNumber(null);
-          setCompareSpeedSeries(null);
-          if (eventName && driver) setLapsLoading(true);
-          if (compareDriver) setCompareLoading(true);
-        }}
-        options={sessionOptions}
-        placeholder="Session"
-      />
-      <VDivider />
-
-      <Select<string>
-        value={driver}
-        onChange={(v) => {
-          setDriver(v);
-          setLap("");
-          setLaps([]);
-          setFastestLapNumber(null);
-          if (eventName && v) setLapsLoading(true);
-          if (v && v === compareDriver) {
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+        <Select<string>
+          value={String(year)}
+          onChange={(v) => {
+            setYear(Number(v));
+            setDriver("");
+            setFetchedDrivers(null);
+            setDriversFallback(false);
+            setLap("");
+            setLaps([]);
+            setFastestLapNumber(null);
             setCompareDriver("");
             setCompareSpeedSeries(null);
-          }
-        }}
-        options={driverOptions}
-        loading={driversLoading}
-        placeholder="Driver"
-      />
-      {driversFallback && eventName ? (
-        <span className="label text-foreground-faint" title="Live roster unavailable; using fallback list.">
-          est.
-        </span>
-      ) : null}
+          }}
+          options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
+          placeholder="Year"
+        />
+        <VDivider />
 
-      <VDivider />
+        <Select<string>
+          value={eventName}
+          onChange={(v) => {
+            setEvent(v);
+            setDriver("");
+            setFetchedDrivers(null);
+            setDriversFallback(false);
+            setDriversLoading(!!v);
+            setLap("");
+            setLaps([]);
+            setFastestLapNumber(null);
+            setCompareDriver("");
+            setCompareSpeedSeries(null);
+          }}
+          options={eventOptions}
+          loading={eventsLoading}
+          placeholder="Grand Prix"
+        />
+        <VDivider />
 
-      <Select<string>
-        value={lap}
-        onChange={(v) => {
-          setLap(v);
-          if (v && result) setLapOverlayLoading(true);
-        }}
-        options={lapOptions}
-        loading={lapsLoading}
-        placeholder="Fastest"
-      />
-      {lapOverlayLoading ? (
-        <span className="label text-foreground-faint">syncing…</span>
-      ) : null}
+        <Select<SessionId>
+          value={session}
+          onChange={(v) => {
+            setSession(v);
+            setLap("");
+            setLaps([]);
+            setFastestLapNumber(null);
+            setCompareSpeedSeries(null);
+            if (eventName && driver) setLapsLoading(true);
+            if (compareDriver) setCompareLoading(true);
+          }}
+          options={sessionOptions}
+          placeholder="Session"
+        />
+        <VDivider />
 
-      <VDivider />
+        <Select<string>
+          value={driver}
+          onChange={(v) => {
+            setDriver(v);
+            setLap("");
+            setLaps([]);
+            setFastestLapNumber(null);
+            if (eventName && v) setLapsLoading(true);
+            if (v && v === compareDriver) {
+              setCompareDriver("");
+              setCompareSpeedSeries(null);
+            }
+          }}
+          options={driverOptions}
+          loading={driversLoading}
+          placeholder="Driver"
+        />
+        {driversFallback && eventName ? (
+          <span className="label shrink-0 text-foreground-faint" title="Live roster unavailable; using fallback list.">
+            est.
+          </span>
+        ) : null}
 
-      <Select<string>
-        value={compareDriver}
-        onChange={(v) => {
-          setCompareDriver(v);
-          if (v) setCompareLoading(true);
-          else setCompareSpeedSeries(null);
-        }}
-        options={compareDriverOptions}
-        loading={compareLoading}
-        placeholder="vs Driver"
-      />
+        <VDivider />
 
-      <div className="flex-1" />
+        <Select<string>
+          value={lap}
+          onChange={(v) => {
+            setLap(v);
+            if (v && result) setLapOverlayLoading(true);
+          }}
+          options={lapOptions}
+          loading={lapsLoading}
+          placeholder="Fastest"
+        />
+        {lapOverlayLoading ? (
+          <span className="label shrink-0 text-foreground-faint">syncing…</span>
+        ) : null}
 
-      <StarButton
-        kind="analyze"
-        payload={{
-          query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
-          driver,
-          session_info: { event: eventName, year, session_type: session },
-        }}
-        canSave={canRun}
-        savedQueries={savedQueries}
-        onChange={onSavedQueriesChange}
-      />
+        <VDivider />
 
-      <button
-        onClick={onAnalyze}
-        disabled={!canRun}
-        className="btn btn--accent shrink-0 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        {isLoading ? "Computing…" : "Analyze"}
-      </button>
+        <Select<string>
+          value={compareDriver}
+          onChange={(v) => {
+            setCompareDriver(v);
+            if (v) setCompareLoading(true);
+            else setCompareSpeedSeries(null);
+          }}
+          options={compareDriverOptions}
+          loading={compareLoading}
+          placeholder="vs Driver"
+        />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <StarButton
+          kind="analyze"
+          payload={{
+            query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
+            driver,
+            session_info: { event: eventName, year, session_type: session },
+          }}
+          canSave={canRun}
+          savedQueries={savedQueries}
+          onChange={onSavedQueriesChange}
+        />
+
+        <button
+          onClick={onAnalyze}
+          disabled={!canRun}
+          className="btn btn--accent shrink-0 disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          {isLoading ? "Computing…" : "Analyze"}
+        </button>
+      </div>
     </div>
   );
 }
