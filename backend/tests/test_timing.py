@@ -59,6 +59,7 @@ class TimingMiddlewareTests(unittest.TestCase):
             self.assertIn("p95_ms", stats)
             self.assertIn("max_ms", stats)
             self.assertIn("last_ms", stats)
+            self.assertIn("error_rate", stats)
 
     def test_metrics_disabled_via_env(self):
         # Build a fresh app with METRICS_ENABLED=false so the middleware skips work.
@@ -70,12 +71,30 @@ class TimingMiddlewareTests(unittest.TestCase):
 
             self.assertFalse(_is_enabled())
 
-    def test_buffer_capped_at_50(self):
+    def test_buffer_capped_at_500(self):
         # Hammer the welcome endpoint past the cap and confirm count stays bounded.
-        for _ in range(75):
+        for _ in range(550):
             self.client.get("/")
         snap = snapshot_metrics()
-        self.assertLessEqual(snap["GET /"]["count"], 50)
+        self.assertLessEqual(snap["GET /"]["count"], 500)
+
+    def test_error_rate_counts_5xx_only(self):
+        from core.timing import _record
+
+        _record("GET /fake", 0.01, 200)
+        _record("GET /fake", 0.02, 404)
+        _record("GET /fake", 0.03, 500)
+        _record("GET /fake", 0.04, 503)
+        snap = snapshot_metrics()
+        self.assertEqual(snap["GET /fake"]["count"], 4)
+        # 2 of 4 samples are 5xx → 0.5
+        self.assertEqual(snap["GET /fake"]["error_rate"], 0.5)
+
+    def test_error_rate_zero_when_all_2xx(self):
+        self.client.get("/")
+        self.client.get("/")
+        snap = snapshot_metrics()
+        self.assertEqual(snap["GET /"]["error_rate"], 0.0)
 
 
 class TimingHelpersTests(unittest.TestCase):

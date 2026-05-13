@@ -19,8 +19,8 @@ Design:
 
 Limits (intentional):
 - Single process only — multi-worker would need Redis or a shared backend.
-- Last 50 samples per route; older drop off. p95 on 50 samples is noisy
-  but the deltas we care about (3s → 300ms) dwarf the noise.
+- Last 500 samples per route; older drop off. 500 keeps p95 stable on low
+  traffic, and summary math stays a microsecond job.
 - No trace spans, no per-user breakdown, no histograms. v1.
 """
 
@@ -38,8 +38,8 @@ from starlette.responses import Response
 from starlette.routing import Match
 
 
-_SAMPLE_CAP = 50
-_buffers: dict[str, deque[float]] = {}
+_SAMPLE_CAP = 500
+_buffers: dict[str, deque[tuple[float, int]]] = {}
 
 
 def _is_enabled() -> bool:
@@ -57,12 +57,12 @@ def _route_key(request: Request) -> str:
     return f"{request.method} {request.url.path}"
 
 
-def _record(route: str, duration_s: float) -> None:
+def _record(route: str, duration_s: float, status: int) -> None:
     buf = _buffers.get(route)
     if buf is None:
         buf = deque(maxlen=_SAMPLE_CAP)
         _buffers[route] = buf
-    buf.append(duration_s)
+    buf.append((duration_s, status))
 
 
 def _percentile(samples: Iterable[float], pct: float) -> float:
@@ -90,12 +90,15 @@ def snapshot_metrics() -> dict[str, dict[str, float | int]]:
         if not buf:
             continue
         samples = list(buf)
+        durations = [d for d, _ in samples]
+        errors = sum(1 for _, s in samples if s >= 500)
         out[route] = {
             "count": len(samples),
-            "p50_ms": round(_percentile(samples, 0.50) * 1000, 1),
-            "p95_ms": round(_percentile(samples, 0.95) * 1000, 1),
-            "max_ms": round(max(samples) * 1000, 1),
-            "last_ms": round(samples[-1] * 1000, 1),
+            "p50_ms": round(_percentile(durations, 0.50) * 1000, 1),
+            "p95_ms": round(_percentile(durations, 0.95) * 1000, 1),
+            "max_ms": round(max(durations) * 1000, 1),
+            "last_ms": round(durations[-1] * 1000, 1),
+            "error_rate": round(errors / len(samples), 3),
         }
     return out
 
@@ -109,11 +112,23 @@ class TimingMiddleware(BaseHTTPMiddleware):
         if not _is_enabled():
             return await call_next(request)
         start = time.perf_counter()
-        response: Response = await call_next(request)
+        status = 500
+        try:
+            response: Response = await call_next(request)
+            status = response.status_code
+        except Exception:
+            # Unhandled exceptions bubble up to Starlette's 500 handler; we
+            # still want the sample on the error_rate denominator.
+            elapsed = time.perf_counter() - start
+            try:
+                _record(_route_key(request), elapsed, 500)
+            except Exception:  # noqa: BLE001 — never swallow the original
+                pass
+            raise
         elapsed = time.perf_counter() - start
         try:
             route = _route_key(request)
-            _record(route, elapsed)
+            _record(route, elapsed, status)
         except Exception:  # noqa: BLE001 — never break a response on metrics
             pass
         response.headers["X-Process-Time"] = f"{elapsed * 1000:.1f}"
