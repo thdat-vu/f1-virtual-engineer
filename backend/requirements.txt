@@ -14,6 +14,10 @@ slowapi
 httpx
 pyjwt
 cachetools
+# certifi ships the CA bundle PyJWKClient uses to fetch the Supabase
+# JWKS over HTTPS — macOS Python.org installers don't expose a system
+# one, so we pin it explicitly rather than relying on transitive deps.
+certifi
 redis
 # fakeredis is used only by backend/tests/test_redis_cache.py — it lets
 # us cover the L2 cache wiring in CI without provisioning a real Redis.

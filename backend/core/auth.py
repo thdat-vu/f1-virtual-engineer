@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import logging
 import os
+import ssl
 from typing import Any
 
+import certifi
 import jwt
 from fastapi import HTTPException, Request, status
 from jwt import PyJWKClient
@@ -54,14 +56,23 @@ def _get_supabase_url() -> str | None:
 
 
 def _get_jwks_client() -> PyJWKClient | None:
-    """Return a cached PyJWKClient for the current SUPABASE_URL, or None when unset."""
+    """Return a cached PyJWKClient for the current SUPABASE_URL, or None when unset.
+
+    We pass an explicit ``ssl_context`` built from ``certifi`` because the
+    Python.org installer on macOS ships without a system CA bundle, and
+    ``PyJWKClient`` uses ``urllib`` under the hood — without this, the first
+    JWKS fetch fails with ``CERTIFICATE_VERIFY_FAILED`` and every verify
+    falls back through to the legacy HS256 path, which of course rejects the
+    ES256 token. See https://docs.python.org/3/library/urllib.request.html.
+    """
     base_url = _get_supabase_url()
     if not base_url:
         return None
     client = _jwks_clients.get(base_url)
     if client is None:
         jwks_url = f"{base_url}/auth/v1/.well-known/jwks.json"
-        client = PyJWKClient(jwks_url, cache_keys=True)
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        client = PyJWKClient(jwks_url, cache_keys=True, ssl_context=ssl_context)
         _jwks_clients[base_url] = client
     return client
 
