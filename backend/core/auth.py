@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 import ssl
+from pathlib import Path
 from typing import Any
 
 import certifi
@@ -32,7 +33,11 @@ from jwt import PyJWKClient
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # Load backend/.env explicitly. Without the path, dotenv walks up from CWD
+    # and misses the file when uvicorn is launched from the repo root (the
+    # default in run-backend.sh). That silently leaves SUPABASE_URL unset,
+    # which makes _get_jwks_client() return None and every verify fall to 401.
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 except ImportError:  # dotenv is optional in production
     pass
 

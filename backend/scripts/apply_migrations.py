@@ -25,7 +25,9 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # Explicit path to backend/.env so this script works whether you run it
+    # from backend/ (as the docstring suggests) or from the repo root.
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 except ImportError:
     pass
 

@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 from core import redis_cache
@@ -28,7 +29,11 @@ from core import redis_cache
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # Point dotenv at backend/.env explicitly — bare load_dotenv() walks up
+    # from CWD, which is the repo root under scripts/run-backend.sh, so the
+    # file in the backend/ subdir is silently missed and GEMINI_API_KEY ends
+    # up unset. Same trap as the one fixed in core/auth.py.
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 except ImportError:  # dotenv is optional in production
     pass
 
