@@ -72,18 +72,20 @@ export function TelemetryChart({
 
   useEffect(() => {
     if (!pathRef.current || !hasData) return;
-    const len = pathRef.current.getTotalLength();
-    pathRef.current.style.strokeDasharray = `${len}`;
-    pathRef.current.style.strokeDashoffset = `${len}`;
+    // Path carries pathLength="1", so the SVG engine maps all
+    // stroke-dash math to that unit length — independent of the path's
+    // user-unit length AND of non-uniform viewBox scaling introduced by
+    // preserveAspectRatio="none". Using getTotalLength() instead was
+    // fine on ~1000px viewports but truncated the tail on wider ones,
+    // because vectorEffect="non-scaling-stroke" reinterprets the dash
+    // array in screen pixels while getTotalLength() returns user units.
+    pathRef.current.style.strokeDasharray = "1";
+    pathRef.current.style.strokeDashoffset = "1";
     const anim = pathRef.current.animate(
-      [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
+      [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }],
       { duration: 900, easing: "cubic-bezier(0.22,1,0.36,1)", fill: "forwards" },
     );
     return () => anim.cancel();
-    // geom is intentionally excluded from deps — it's rebuilt every render
-    // (including on hover), which would reset the stroke-dash animation
-    // mid-draw and leave the line's tail unpainted on wide viewports where
-    // the cursor is usually over the chart.
   }, [hasData, animateKey]);
 
   return (
@@ -179,6 +181,7 @@ export function TelemetryChart({
               <path
                 ref={pathRef}
                 d={geom.linePath}
+                pathLength="1"
                 fill="none"
                 stroke="var(--accent)"
                 strokeWidth="1.4"
