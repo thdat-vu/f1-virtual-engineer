@@ -28,7 +28,14 @@ from __future__ import annotations
 import os
 import unittest
 
-import pytest
+try:
+    import pytest  # type: ignore
+    _HAS_PYTEST = True
+except ImportError:
+    # The repo ships two test runners (pytest + unittest discover). The
+    # unittest runner doesn't carry pytest as a dep, so we degrade the
+    # parametrized eval to a hard skip rather than crashing on import.
+    _HAS_PYTEST = False
 
 from core import llm as core_llm
 from evals.cases.rationale_fixtures import FIXTURES
@@ -38,29 +45,30 @@ def _eval_enabled() -> bool:
     return os.environ.get("RUN_LLM_EVAL") == "1" and bool(os.environ.get("GEMINI_API_KEY"))
 
 
-@pytest.mark.skipif(
-    not _eval_enabled(),
-    reason="LLM eval harness is opt-in: set RUN_LLM_EVAL=1 and GEMINI_API_KEY to run.",
-)
-@pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f["name"])
-def test_rationale_fixture(fixture):
-    # Drop both cache tiers so a previous fixture's cached output cannot
-    # accidentally satisfy a different fixture's expected/forbidden lists.
-    core_llm._reset_cache_for_tests()
+if _HAS_PYTEST:
+    @pytest.mark.skipif(
+        not _eval_enabled(),
+        reason="LLM eval harness is opt-in: set RUN_LLM_EVAL=1 and GEMINI_API_KEY to run.",
+    )
+    @pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f["name"])
+    def test_rationale_fixture(fixture):
+        # Drop both cache tiers so a previous fixture's cached output cannot
+        # accidentally satisfy a different fixture's expected/forbidden lists.
+        core_llm._reset_cache_for_tests()
 
-    text = core_llm.generate_rationale(fixture["context"])
-    assert text, f"generate_rationale returned no text for {fixture['name']!r}"
-    assert isinstance(text, str)
+        text = core_llm.generate_rationale(fixture["context"])
+        assert text, f"generate_rationale returned no text for {fixture['name']!r}"
+        assert isinstance(text, str)
 
-    haystack = text.lower()
-    for needle in fixture.get("expected_substrings", []):
-        assert needle.lower() in haystack, (
-            f"{fixture['name']}: expected substring {needle!r} missing from rationale: {text!r}"
-        )
-    for forbidden in fixture.get("forbidden_substrings", []):
-        assert forbidden.lower() not in haystack, (
-            f"{fixture['name']}: forbidden substring {forbidden!r} present in rationale: {text!r}"
-        )
+        haystack = text.lower()
+        for needle in fixture.get("expected_substrings", []):
+            assert needle.lower() in haystack, (
+                f"{fixture['name']}: expected substring {needle!r} missing from rationale: {text!r}"
+            )
+        for forbidden in fixture.get("forbidden_substrings", []):
+            assert forbidden.lower() not in haystack, (
+                f"{fixture['name']}: forbidden substring {forbidden!r} present in rationale: {text!r}"
+            )
 
 
 class HarnessSmokeTests(unittest.TestCase):
@@ -77,6 +85,4 @@ class HarnessSmokeTests(unittest.TestCase):
             self.assertIsInstance(fx["expected_substrings"], list)
             self.assertIsInstance(fx["forbidden_substrings"], list)
             self.assertTrue(fx["expected_substrings"], f"{fx['name']}: expected_substrings is empty")
-            # context must at least carry an intent dict — the LLM context
-            # builder always emits one.
             self.assertIn("intent", fx["context"])
