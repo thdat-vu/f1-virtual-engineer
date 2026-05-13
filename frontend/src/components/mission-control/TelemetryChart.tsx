@@ -71,7 +71,7 @@ export function TelemetryChart({
   };
 
   useEffect(() => {
-    if (!pathRef.current || !hasData || !geom) return;
+    if (!pathRef.current || !hasData) return;
     const len = pathRef.current.getTotalLength();
     pathRef.current.style.strokeDasharray = `${len}`;
     pathRef.current.style.strokeDashoffset = `${len}`;
@@ -80,7 +80,11 @@ export function TelemetryChart({
       { duration: 900, easing: "cubic-bezier(0.22,1,0.36,1)", fill: "forwards" },
     );
     return () => anim.cancel();
-  }, [hasData, animateKey, geom]);
+    // geom is intentionally excluded from deps — it's rebuilt every render
+    // (including on hover), which would reset the stroke-dash animation
+    // mid-draw and leave the line's tail unpainted on wide viewports where
+    // the cursor is usually over the chart.
+  }, [hasData, animateKey]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
