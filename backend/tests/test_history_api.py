@@ -273,12 +273,25 @@ class HistoryEndpointTests(unittest.TestCase):
 class AuthHelperUnitTests(unittest.TestCase):
     """Light unit tests for core/auth helpers that don't touch FastAPI."""
 
-    def test_verify_supabase_jwt_returns_none_when_secret_missing(self):
+    def setUp(self):
+        # Supabase JWT Signing Keys migration means prior tests may have
+        # populated the JWKS client cache with a real URL — clear it so each
+        # test gets a deterministic starting point.
+        from core.auth import _reset_clients_for_tests
+        _reset_clients_for_tests()
+
+    def test_verify_supabase_jwt_returns_none_when_no_config(self):
         from core.auth import verify_supabase_jwt
-        with patch.dict("os.environ", {}, clear=False):
-            import os
-            os.environ.pop("SUPABASE_JWT_SECRET", None)
+        import os
+        prior_secret = os.environ.pop("SUPABASE_JWT_SECRET", None)
+        prior_url = os.environ.pop("SUPABASE_URL", None)
+        try:
             self.assertIsNone(verify_supabase_jwt("any.token.here"))
+        finally:
+            if prior_secret is not None:
+                os.environ["SUPABASE_JWT_SECRET"] = prior_secret
+            if prior_url is not None:
+                os.environ["SUPABASE_URL"] = prior_url
 
     def test_verify_supabase_jwt_returns_none_for_garbage_token(self):
         from core.auth import verify_supabase_jwt
@@ -289,7 +302,7 @@ class AuthHelperUnitTests(unittest.TestCase):
         finally:
             os.environ.pop("SUPABASE_JWT_SECRET", None)
 
-    def test_verify_supabase_jwt_round_trip(self):
+    def test_verify_supabase_jwt_legacy_hs256_round_trip(self):
         import os
         import jwt as pyjwt
         from core.auth import verify_supabase_jwt
@@ -307,6 +320,45 @@ class AuthHelperUnitTests(unittest.TestCase):
             self.assertEqual(claims["sub"], "user-123")
         finally:
             os.environ.pop("SUPABASE_JWT_SECRET", None)
+
+    def test_verify_supabase_jwt_asymmetric_via_jwks(self):
+        """ES256 Supabase tokens must verify through the JWKS fetch path.
+
+        Supabase migrated projects to asymmetric JWT Signing Keys — headers now
+        carry ``alg=ES256`` and a ``kid`` rather than HS256. This test proves
+        the dispatch path calls into PyJWKClient and accepts the claims.
+        """
+        import os
+        import jwt as pyjwt
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from unittest.mock import MagicMock
+
+        from core import auth as core_auth
+
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        public_key = private_key.public_key()
+        token = pyjwt.encode(
+            {"sub": "user-es256", "aud": "authenticated"},
+            private_key,
+            algorithm="ES256",
+            headers={"kid": "test-kid"},
+        )
+
+        fake_signing_key = MagicMock()
+        fake_signing_key.key = public_key
+        fake_client = MagicMock()
+        fake_client.get_signing_key_from_jwt.return_value = fake_signing_key
+
+        os.environ["SUPABASE_URL"] = "https://example.supabase.co"
+        try:
+            with patch.object(core_auth, "PyJWKClient", return_value=fake_client):
+                claims = core_auth.verify_supabase_jwt(token)
+            self.assertIsNotNone(claims)
+            self.assertEqual(claims["sub"], "user-es256")
+            fake_client.get_signing_key_from_jwt.assert_called_once_with(token)
+        finally:
+            os.environ.pop("SUPABASE_URL", None)
+            core_auth._reset_clients_for_tests()
 
 
 if __name__ == "__main__":
