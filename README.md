@@ -87,6 +87,17 @@ FASTF1_PREBAKE_WRITE=true python3 -m scripts.prebake
 
 The script iterates over a small `DEMO_SESSIONS` list (currently 2024 Monza R for VER/HAM/LEC) and writes one gzipped-JSON snapshot per helper call into `backend/data/prebake/`. Edit that list to bake additional sessions — each new entry costs one real FastF1 load (~5–30 s) but pays off on every subsequent restart. Snapshots are gitignored by default; commit them only if you want them shipped in the Docker image.
 
+### LLM rationale eval harness
+
+`backend/evals/cases/rationale_fixtures.py` ships a small set of pinned contexts that exercise the engineer-voice rationale (telemetry, strategy, citation-grounded, fallback). The eval is **opt-in** so CI never burns Gemini quota — both `RUN_LLM_EVAL=1` and `GEMINI_API_KEY` must be set:
+
+```bash
+cd backend
+RUN_LLM_EVAL=1 python3 -m pytest tests/test_eval_rationale.py -v
+```
+
+Each fixture asserts that every `expected_substrings` entry appears in the generated text and no `forbidden_substrings` entry leaks through. Add a new case by appending to the fixtures file — the harness picks it up via parametrize, no harness change needed. Run before merging any prompt change in `core/llm.py`.
+
 ---
 
 ## Getting Started
