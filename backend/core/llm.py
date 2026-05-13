@@ -23,6 +23,8 @@ import os
 import time
 from typing import Any
 
+from core import redis_cache
+
 try:
     from dotenv import load_dotenv
 
@@ -34,6 +36,14 @@ except ImportError:  # dotenv is optional in production
 _logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 60
+# L2 (Redis) survives restarts, so it can hold values longer than the
+# in-process dict. Gemini outputs aren't truly stable across days, but an
+# hour is a sane balance between cache hit rate and refreshing on real
+# data drift.
+_L2_TTL_SECONDS = 3600
+_L2_NAMESPACE_RATIONALE = "rationale"
+_L2_NAMESPACE_STRUCTURED = "structured"
+
 _cache: dict[str, tuple[float, str]] = {}
 
 _genai_module = None  # set on first successful configure
@@ -94,6 +104,13 @@ def generate_rationale(context: dict[str, Any], *, model: str = "gemini-2.0-flas
         if time.time() - ts < _CACHE_TTL_SECONDS:
             return text
 
+    # L2 — survives process restarts. Same hash key, separate namespace per
+    # call site so a rationale never collides with a structured payload.
+    l2_hit = redis_cache.get(_L2_NAMESPACE_RATIONALE, cache_key)
+    if isinstance(l2_hit, str) and l2_hit:
+        _cache[cache_key] = (time.time(), l2_hit)
+        return l2_hit
+
     genai = _ensure_configured()
     if genai is None:
         return None
@@ -111,6 +128,7 @@ def generate_rationale(context: dict[str, Any], *, model: str = "gemini-2.0-flas
         return None
 
     _cache[cache_key] = (time.time(), text)
+    redis_cache.set(_L2_NAMESPACE_RATIONALE, cache_key, text, ttl_seconds=_L2_TTL_SECONDS)
     return text
 
 
@@ -142,6 +160,18 @@ def generate_structured(
                 # Cache contained malformed JSON — drop it and fall through.
                 _cache.pop(cache_key, None)
 
+    # L2 holds the raw model text; we re-parse on hit so a corrupted entry
+    # is treated like a miss without poisoning the L1 dict.
+    l2_hit = redis_cache.get(_L2_NAMESPACE_STRUCTURED, cache_key)
+    if isinstance(l2_hit, str) and l2_hit:
+        try:
+            parsed = json.loads(l2_hit)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            _cache[cache_key] = (time.time(), l2_hit)
+            return parsed
+
     genai = _ensure_configured()
     if genai is None:
         return None
@@ -172,6 +202,7 @@ def generate_structured(
         return None
 
     _cache[cache_key] = (time.time(), text)
+    redis_cache.set(_L2_NAMESPACE_STRUCTURED, cache_key, text, ttl_seconds=_L2_TTL_SECONDS)
     return parsed
 
 
