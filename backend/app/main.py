@@ -19,6 +19,7 @@ from app.schemas.saved_queries import (
     SavedQueryItem,
     SavedQueryListResponse,
 )
+from app.schemas.knowledge import KnowledgeLookupRequest, KnowledgeLookupResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from core.auth import get_optional_user_id, get_required_user_id
@@ -42,6 +43,7 @@ from tools.fastf1_helper import (
     get_year_schedule,
     load_prebaked_into_caches,
 )
+from tools.knowledge_retriever import lookup as knowledge_lookup
 
 
 _logger = logging.getLogger(__name__)
@@ -102,6 +104,7 @@ app = FastAPI(
         {"name": "system", "description": "Basic service discovery and health-style endpoints."},
         {"name": "analysis", "description": "Telemetry and strategy analysis workflows for the mission-control UI."},
         {"name": "telemetry", "description": "Strict telemetry contract endpoints backed by FastF1 summaries."},
+        {"name": "knowledge", "description": "FIA regulation retrieval for citation-backed answers."},
     ],
 )
 
@@ -606,6 +609,30 @@ async def remove_saved_query(
             },
         )
     return JSONResponse(status_code=204, content=None)
+
+
+@app.post(
+    "/knowledge/lookup",
+    response_model=KnowledgeLookupResponse,
+    tags=["knowledge"],
+    summary="Retrieve FIA regulation citations for a natural-language query",
+    description=(
+        "Runs a BM25 lookup over the curated FIA regulation corpus and returns "
+        "the top-k matching entries with title, source, section, topics, snippet, "
+        "and score — ready for downstream citation rendering."
+    ),
+)
+@limiter.limit("10/10seconds")
+async def knowledge_lookup_endpoint(
+    request: Request,
+    body: KnowledgeLookupRequest,
+):
+    citations = await asyncio.to_thread(knowledge_lookup, body.query, body.k)
+    return {
+        "status": "success",
+        "query": body.query,
+        "citations": citations,
+    }
 
 
 if __name__ == "__main__":

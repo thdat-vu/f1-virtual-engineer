@@ -18,3 +18,4 @@ redis
 # fakeredis is used only by backend/tests/test_redis_cache.py — it lets
 # us cover the L2 cache wiring in CI without provisioning a real Redis.
 fakeredis
+rank-bm25
