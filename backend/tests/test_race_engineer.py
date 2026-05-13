@@ -79,6 +79,47 @@ class RaceEngineerTests(unittest.TestCase):
         self.assertEqual(result["execution"]["step_limit"], 6)
         self.assertIsInstance(result["execution"]["trace"], list)
         self.assertEqual(result["retry"]["count"], 0)
+        self.assertEqual(result["citations"], [])
+
+    @patch("agents.race_engineer.get_session_telemetry_summary")
+    def test_analyze_query_attaches_citations_when_query_mentions_regulations(self, mock_summary):
+        mock_summary.return_value = {
+            "driver": "HAM",
+            "year": 2023,
+            "event": "Japanese Grand Prix",
+            "session_type": "R",
+            "sample_points": 3,
+            "speed": {"min": 250.0, "max": 260.0, "avg": 255.0, "unit": "km/h"},
+            "gear": {"min": 7.0, "max": 8.0, "avg": 7.3, "unit": "gear"},
+            "rpm": {"min": 12000.0, "max": 12500.0, "avg": 12300.0, "unit": "rpm"},
+            "source": "fastf1",
+            "fallback": False,
+            "fallback_reason": None,
+        }
+        result = analyze_query("ham japan 2023 race DRS rules")
+        self.assertTrue(result["citations"], "expected DRS citation for regulation query")
+        self.assertEqual(result["citations"][0]["id"], "drs-activation")
+
+    @patch("agents.race_engineer.knowledge_lookup")
+    @patch("agents.race_engineer.get_session_telemetry_summary")
+    def test_analyze_query_citation_failure_is_swallowed(self, mock_summary, mock_lookup):
+        mock_summary.return_value = {
+            "driver": "HAM",
+            "year": 2023,
+            "event": "Japanese Grand Prix",
+            "session_type": "R",
+            "sample_points": 3,
+            "speed": {"min": 250.0, "max": 260.0, "avg": 255.0, "unit": "km/h"},
+            "gear": {"min": 7.0, "max": 8.0, "avg": 7.3, "unit": "gear"},
+            "rpm": {"min": 12000.0, "max": 12500.0, "avg": 12300.0, "unit": "rpm"},
+            "source": "fastf1",
+            "fallback": False,
+            "fallback_reason": None,
+        }
+        mock_lookup.side_effect = RuntimeError("index unavailable")
+        result = analyze_query("ham japan 2023 race pit lane speed penalty")
+        self.assertEqual(result["citations"], [])
+        self.assertIsNone(result["error"])
 
     @patch("agents.race_engineer.get_session_telemetry_summary")
     def test_analyze_query_uses_memory_for_follow_up_without_driver(self, mock_summary):

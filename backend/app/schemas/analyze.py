@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.knowledge import KnowledgeCitation
 from app.schemas.telemetry import TelemetrySummary
 
 
@@ -89,3 +90,7 @@ class AnalyzeResponse(BaseModel):
     memory: AnalyzeMemory | None = None
     execution: AnalyzeExecution | None = None
     retry: AnalyzeRetry | None = None
+    citations: list[KnowledgeCitation] = Field(
+        default_factory=list,
+        description="FIA regulation citations retrieved for the query; empty when the query is telemetry-only or no entries matched.",
+    )

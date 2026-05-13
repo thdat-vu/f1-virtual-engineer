@@ -268,6 +268,7 @@ async def analyze_race_data(
         "memory": result.get("memory"),
         "execution": result.get("execution"),
         "retry": result.get("retry"),
+        "citations": result.get("citations", []),
     }
 
 

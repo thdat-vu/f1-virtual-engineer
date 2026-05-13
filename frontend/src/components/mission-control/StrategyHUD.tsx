@@ -6,6 +6,7 @@ import { TeamIcon } from "@/components/icons/TeamIcons";
 import { RecentAnalyses } from "./RecentAnalyses";
 import { RecentTelemetry } from "./RecentTelemetry";
 import { RadioLog } from "./RadioLog";
+import { ReferencesPanel } from "./ReferencesPanel";
 import { SavedQueriesPanel } from "./SavedQueriesPanel";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
@@ -107,6 +108,8 @@ export function StrategyHUD({
             )}
           </motion.div>
         )}
+
+        <ReferencesPanel items={result?.citations} />
 
         <RecentAnalyses refreshSignal={historyRefreshSignal} onSelect={onSelectHistory} />
         <RecentTelemetry

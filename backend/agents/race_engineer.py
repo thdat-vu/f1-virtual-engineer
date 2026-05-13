@@ -9,10 +9,12 @@ from langgraph.graph import END, StateGraph
 from core.llm import generate_rationale
 from core.trace import start_trace, get_trace, traced
 from tools.fastf1_helper import get_session_telemetry_summary as _raw_get_telemetry
+from tools.knowledge_retriever import lookup as _raw_knowledge_lookup
 from tools.strategy_helper import strategy_analyzer as _raw_strategy_analyzer
 
 get_session_telemetry_summary = traced("telemetry")(_raw_get_telemetry)
 strategy_analyzer = traced("strategy")(_raw_strategy_analyzer)
+knowledge_lookup = traced("knowledge")(_raw_knowledge_lookup)
 
 DEFAULT_EVENT = "Japanese Grand Prix"
 DEFAULT_SESSION_TYPE = "R"
@@ -98,6 +100,14 @@ COMPARE_PATTERN = re.compile(r"\b(compare|versus|vs|so voi|against)\b", re.IGNOR
 FOLLOWUP_PATTERN = re.compile(r"\b(and|what\s+about|how\s+about|him|her|them|his|their|also|furthermore|he|she|it|again)\b", re.IGNORECASE)
 STRATEGY_PATTERN = re.compile(
     r"\b(strategy|pit|pit\s+window|undercut|overcut|tyre|tire|wear|degradation|should\s+.*pit|box)\b",
+    re.IGNORECASE,
+)
+# Queries that mention any of these deserve an FIA regulation lookup. Keep the
+# list tight — matching anything fires BM25 ranking, so an over-broad pattern
+# would attach citations to pure telemetry questions and dilute the signal.
+KNOWLEDGE_PATTERN = re.compile(
+    r"\b(drs|safety\s*car|yellow\s*flag|pit\s*lane|pit\s*speed|tyre\s*compound|tire\s*compound|"
+    r"compound|regulation|rule|rules|fia|penalty|penalties|steward|stewards|flag|restart)\b",
     re.IGNORECASE,
 )
 DOMAIN_KEYWORDS = ("strategy", "telemetry", "pace", "data", "result", "box", "speed", "gear", "rpm", "pit", "window", "pit soon", "should he", "should she")
@@ -497,6 +507,12 @@ def analyze_query(
     termination_reason = "completed"
     start_time = monotonic()
     start_trace()
+    citations: list[dict[str, Any]] = []
+    if KNOWLEDGE_PATTERN.search(query or ""):
+        try:
+            citations = knowledge_lookup(query, 2) or []
+        except Exception:  # noqa: BLE001 — retrieval must never break /analyze
+            citations = []
     try:
         result = app_graph.invoke(
             {
@@ -541,6 +557,7 @@ def analyze_query(
                 "max_retries": MAX_TOOL_RETRIES,
                 "retryable_exhausted": False,
             },
+            "citations": citations,
         }
 
     elapsed_ms = (monotonic() - start_time) * 1000
@@ -596,4 +613,5 @@ def analyze_query(
             "retry_backoff_seconds": result.get("retry_metadata", {}).get("retry_backoff_seconds", RETRY_BACKOFF_SECONDS),
             "retryable_exhausted": result.get("retry_metadata", {}).get("retryable_exhausted", False),
         },
+        "citations": citations,
     }

@@ -53,7 +53,18 @@ export interface AnalyzeResponse {
   strategy_data?: StrategyData | null;
   rationale_source?: "llm" | "template";
   execution?: AnalyzeExecution | null;
+  citations?: KnowledgeCitation[];
   error?: string | null;
+}
+
+export interface KnowledgeCitation {
+  id: string;
+  title: string;
+  source: string;
+  section: string;
+  topics: string[];
+  snippet: string;
+  score: number;
 }
 
 export interface TraceEntry {
