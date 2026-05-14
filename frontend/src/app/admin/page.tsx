@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
+  ClipboardCopy,
   Database,
   Lock,
   RefreshCw,
@@ -72,8 +73,18 @@ export default function AdminPage() {
       hint="Admin metrics are gated behind a specific Supabase user id." />;
   }
   if (!isAdmin) {
-    return <Gate icon={<Shield size={22} />} title="Not authorized"
-      hint="Your account is not the configured admin (NEXT_PUBLIC_ADMIN_USER_ID)." />;
+    return (
+      <Gate
+        icon={<Shield size={22} />}
+        title="Not authorized"
+        hint={
+          ADMIN_ID
+            ? "Your account is not the configured admin (NEXT_PUBLIC_ADMIN_USER_ID)."
+            : "NEXT_PUBLIC_ADMIN_USER_ID is not set. Copy your user id below into frontend/.env.local and restart `npm run dev`."
+        }
+        userId={session.user.id}
+      />
+    );
   }
 
   const rows = data
@@ -238,7 +249,18 @@ function LivePill() {
   );
 }
 
-function Gate({ icon, title, hint }: { icon: React.ReactNode; title: string; hint: string }) {
+function Gate({
+  icon,
+  title,
+  hint,
+  userId,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  userId?: string;
+}) {
+  const [copied, setCopied] = useState(false);
   return (
     <main className="min-h-screen flex items-center justify-center bg-background text-foreground px-6">
       <div className="hero-glow pointer-events-none fixed inset-0 opacity-40" />
@@ -254,6 +276,44 @@ function Gate({ icon, title, hint }: { icon: React.ReactNode; title: string; hin
         <p className="label mb-2">Restricted</p>
         <h1 className="text-[length:var(--text-h2)] font-bold text-foreground">{title}</h1>
         <p className="mt-3 text-[length:var(--text-small)] text-foreground-dim">{hint}</p>
+        {userId && (
+          <div className="mt-5 rounded-sm border border-border bg-surface px-3 py-2 text-left">
+            <p className="label mb-1">Your user id</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate font-mono text-[length:var(--text-readout)] text-foreground">
+                {userId}
+              </code>
+              <button
+                type="button"
+                aria-label="Copy user id"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(userId);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {
+                    /* clipboard unavailable — silent */
+                  }
+                }}
+                className="shrink-0 rounded-sm border border-border-strong px-2 py-1 text-foreground-dim transition-colors hover:text-foreground hover:border-foreground"
+              >
+                <ClipboardCopy size={12} />
+              </button>
+            </div>
+            <AnimatePresence>
+              {copied && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="readout mt-1 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-[var(--accent)]"
+                >
+                  Copied
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
         <Link href="/" className="mt-6 inline-block readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim hover:text-foreground">
           ← Back home
         </Link>
