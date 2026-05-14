@@ -399,3 +399,25 @@ export async function deleteSavedQuery(
     throw new Error(`Delete saved query failed with status ${response.status}`);
   }
 }
+
+export interface MetricsRouteSummary {
+  count: number;
+  p50_ms: number;
+  p95_ms: number;
+  max_ms: number;
+  last_ms: number;
+  error_rate: number;
+}
+
+export interface MetricsResponse {
+  routes: Record<string, MetricsRouteSummary>;
+  cache: { redis_enabled: boolean };
+}
+
+export async function getMetrics(): Promise<MetricsResponse> {
+  const response = await fetch(`${apiBaseUrl}/metrics`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Metrics request failed with status ${response.status}`);
+  }
+  return (await response.json()) as MetricsResponse;
+}
