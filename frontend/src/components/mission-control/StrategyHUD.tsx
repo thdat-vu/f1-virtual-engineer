@@ -53,22 +53,46 @@ export function StrategyHUD({
         </div>
       </div>
 
-      <div className="mx-4 mt-4 shrink-0 border border-accent-dim bg-accent-dim p-4">
-        <p className="label mb-2 text-accent">
-          {rateLimitMessage
-            ? "⚠ RATE LIMITED"
-            : hasData && strat?.undercut_risk === "high" ? "⚠ STRATEGY ALERT" : "SYSTEM STATUS"}
-        </p>
-        <p className="readout text-[0.7rem] font-semibold uppercase leading-snug text-foreground">
-          {rateLimitMessage
-            ? rateLimitMessage
+      {(() => {
+        const status: "ok" | "warn" | "error" | "info" = rateLimitMessage
+          ? "warn"
+          : hasData && strat?.undercut_risk === "high"
+            ? "error"
             : isLoading
-              ? "Fetching telemetry…"
+              ? "info"
               : hasData
-                ? (result?.agent_response ?? "Analysis complete.")
-                : "Select year, grand prix, session and driver above."}
-        </p>
-      </div>
+                ? "ok"
+                : "info";
+        const statusColor = `var(--status-${status})`;
+        const statusBg = `var(--status-${status}-dim)`;
+        const label = rateLimitMessage
+          ? "⚠ RATE LIMITED"
+          : hasData && strat?.undercut_risk === "high"
+            ? "⚠ STRATEGY ALERT"
+            : isLoading
+              ? "ANALYZING"
+              : hasData
+                ? "ANALYSIS COMPLETE"
+                : "SYSTEM STATUS";
+        return (
+          <div
+            className="status-bar mx-4 mt-4 shrink-0 border p-4"
+            data-status={status}
+            style={{ borderColor: statusColor, background: statusBg }}
+          >
+            <p className="label mb-2" style={{ color: statusColor }}>{label}</p>
+            <p className="readout text-[0.7rem] font-semibold uppercase leading-snug text-foreground">
+              {rateLimitMessage
+                ? rateLimitMessage
+                : isLoading
+                  ? "Fetching telemetry…"
+                  : hasData
+                    ? (result?.agent_response ?? "Analysis complete.")
+                    : "Select year, grand prix, session and driver above."}
+            </p>
+          </div>
+        );
+      })()}
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-4">
         <p className="label mb-3">Tactical Rationale</p>
@@ -95,14 +119,23 @@ export function StrategyHUD({
         </AnimatePresence>
 
         {hasData && strat?.recommended_pit_window_laps?.length === 2 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="mb-4 mt-4 border border-border p-3">
-            <p className="label mb-1">Pit Window</p>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="status-bar mb-4 mt-4 border p-3"
+            data-status={strat.fallback ? "warn" : "ok"}
+            style={{
+              borderColor: strat.fallback ? "var(--status-warn)" : "var(--status-ok)",
+              background: strat.fallback ? "var(--status-warn-dim)" : "var(--status-ok-dim)",
+            }}
+          >
+            <p className="label mb-1" style={{ color: strat.fallback ? "var(--status-warn)" : "var(--status-ok)" }}>
+              Pit Window {strat.fallback ? "· FALLBACK" : ""}
+            </p>
             <p className="readout text-base font-bold text-accent">
               LAP {strat.recommended_pit_window_laps[0]} – {strat.recommended_pit_window_laps[1]}
             </p>
             {strat.fallback && (
-              <p className="readout mt-1 text-[0.55rem] text-foreground-faint">
+              <p className="readout mt-1 text-[0.55rem]" style={{ color: "var(--status-warn)" }}>
                 {strat.fallback_reason ?? "Estimate — live data unavailable"}
               </p>
             )}

@@ -9,8 +9,8 @@
 :root {
   /* Canvas */
   --background: #080808;
-  --surface:    #0f0f0f;
-  --surface-elevated: #161616;
+  --surface:    #131313;
+  --surface-elevated: #1c1c1c;
   --overlay:    rgba(8, 8, 8, 0.85);
 
   /* Foreground */
@@ -24,8 +24,20 @@
   --accent-glow:rgba(245, 245, 247, 0.08);
 
   /* Borders */
-  --border:       rgba(255, 255, 255, 0.08);
-  --border-strong:rgba(255, 255, 255, 0.14);
+  --border:       rgba(255, 255, 255, 0.14);
+  --border-strong:rgba(255, 255, 255, 0.22);
+
+  /* Status palette — independent of team accent.
+     Keep these stable across team themes so red always means error,
+     green always means healthy, regardless of which team is active. */
+  --status-ok:        #22c55e;
+  --status-warn:      #f59e0b;
+  --status-error:     #ef4444;
+  --status-info:      #38bdf8;
+  --status-ok-dim:    rgba(34, 197, 94, 0.12);
+  --status-warn-dim:  rgba(245, 158, 11, 0.12);
+  --status-error-dim: rgba(239, 68, 68, 0.12);
+  --status-info-dim:  rgba(56, 189, 248, 0.12);
 
   /* Typography — family */
   --font-sans: -apple-system, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
@@ -161,6 +173,10 @@
   --color-accent-dim:       var(--accent-dim);
   --color-border:           var(--border);
   --color-border-strong:    var(--border-strong);
+  --color-status-ok:        var(--status-ok);
+  --color-status-warn:      var(--status-warn);
+  --color-status-error:     var(--status-error);
+  --color-status-info:      var(--status-info);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
@@ -264,6 +280,38 @@ html, body {
   border: 1px solid var(--border);
 }
 .card--elevated { background: var(--surface-elevated); }
+
+/* Status pill — semantic chip driven by data-status attribute.
+   Pair with --status-ok|warn|error|info via data-status="ok|warn|error|info".
+   Falls back to neutral foreground-dim if no status set. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.125rem;
+  padding: 0.25rem 0.625rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-readout);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground-dim);
+}
+.status-pill[data-status="ok"]    { color: var(--status-ok);    background: var(--status-ok-dim);    border-color: var(--status-ok); }
+.status-pill[data-status="warn"]  { color: var(--status-warn);  background: var(--status-warn-dim);  border-color: var(--status-warn); }
+.status-pill[data-status="error"] { color: var(--status-error); background: var(--status-error-dim); border-color: var(--status-error); }
+.status-pill[data-status="info"]  { color: var(--status-info);  background: var(--status-info-dim);  border-color: var(--status-info); }
+
+/* Status bar — colored 2px left rail used to mark a card/panel state.
+   Pair with data-status="ok|warn|error|info" on the same element. */
+.status-bar {
+  border-left: 2px solid var(--border);
+}
+.status-bar[data-status="ok"]    { border-left-color: var(--status-ok); }
+.status-bar[data-status="warn"]  { border-left-color: var(--status-warn); }
+.status-bar[data-status="error"] { border-left-color: var(--status-error); }
+.status-bar[data-status="info"]  { border-left-color: var(--status-info); }
 
 /* Hairline divider — used as borders between cells when 1px gap needed */
 .divider {

@@ -16,6 +16,7 @@ export function TelemetryChartGrid({
 }) {
   const lapDurationS = tel?.lap_duration_s ?? null;
   const sectorBoundariesS = tel?.sector_boundaries_s ?? [];
+  const fallback = Boolean(tel?.fallback);
   // Sector lines on each chart: fractions of the X axis, derived from boundary seconds / lap duration.
   const sectorFractions =
     hasData && lapDurationS && lapDurationS > 0
@@ -24,6 +25,18 @@ export function TelemetryChartGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0 px-6 py-4">
+      {hasData && fallback && (
+        <div
+          className="status-bar mb-3 flex items-center gap-2 border px-3 py-2"
+          data-status="warn"
+          style={{ borderColor: "var(--status-warn)", background: "var(--status-warn-dim)" }}
+        >
+          <span className="status-pill" data-status="warn">FALLBACK</span>
+          <span className="readout text-[length:var(--text-readout)] text-foreground">
+            {tel?.fallback_reason ?? "Live telemetry unavailable — showing estimate"}
+          </span>
+        </div>
+      )}
       {(["Speed", "Throttle", "Brake"] as const).map((label, i) => {
         const ch = label === "Speed"    ? tel?.speed
                  : label === "Throttle" ? tel?.throttle

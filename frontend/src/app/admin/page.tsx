@@ -20,9 +20,15 @@ import { getMetrics, type MetricsResponse, type MetricsRouteSummary } from "@/se
 const REFRESH_MS = 5_000;
 const ADMIN_ID = process.env.NEXT_PUBLIC_ADMIN_USER_ID?.trim() ?? "";
 const ERROR_RATE_WARN = 0.05;
+const FRESH_MS = 30_000;
 
 const fmtMs = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(2)}s` : `${n.toFixed(1)}ms`);
 const fmtErrorRate = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+function freshnessStatus(updatedAt: number | null): "ok" | "warn" | "info" {
+  if (updatedAt === null) return "info";
+  return Date.now() - updatedAt < FRESH_MS ? "ok" : "warn";
+}
 
 export default function AdminPage() {
   const { session, configured } = useSupabase();
@@ -133,17 +139,17 @@ export default function AdminPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
-          <Pill icon={<Database size={12} />}>
-            Redis · {data?.cache.redis_enabled ? <span className="text-foreground">enabled</span> : "disabled"}
-          </Pill>
-          <Pill icon={<TrendingUp size={12} />}>
-            Routes · <span className="text-foreground">{rows.length}</span>
-          </Pill>
-          <Pill icon={<Activity size={12} />}>
-            Auto-refresh · {(REFRESH_MS / 1000).toFixed(0)}s
-          </Pill>
+          <span className="status-pill" data-status={data?.cache.redis_enabled ? "ok" : "warn"}>
+            <Database size={12} /> Redis · {data?.cache.redis_enabled ? "enabled" : "disabled"}
+          </span>
+          <span className="status-pill" data-status={rows.length > 0 ? "info" : undefined}>
+            <TrendingUp size={12} /> Routes · {rows.length}
+          </span>
+          <span className="status-pill">
+            <Activity size={12} /> Auto-refresh · {(REFRESH_MS / 1000).toFixed(0)}s
+          </span>
           {updatedAt && (
-            <span className="readout text-foreground-faint">
+            <span className="status-pill" data-status={freshnessStatus(updatedAt)}>
               updated {new Date(updatedAt).toLocaleTimeString()}
             </span>
           )}
@@ -152,8 +158,10 @@ export default function AdminPage() {
 
       <section className="relative z-10 mx-auto max-w-6xl px-6 pb-20">
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-sm border border-border-strong bg-surface-elevated px-4 py-3 text-[length:var(--text-small)] text-foreground">
-            <AlertTriangle size={14} /> Failed to load metrics: {error}
+          <div className="mb-4 flex items-center gap-2 rounded-sm border bg-surface-elevated px-4 py-3 text-[length:var(--text-small)] text-foreground status-bar"
+               data-status="error"
+               style={{ borderColor: "var(--status-error)", background: "var(--status-error-dim)" }}>
+            <AlertTriangle size={14} style={{ color: "var(--status-error)" }} /> Failed to load metrics: {error}
           </div>
         )}
 
@@ -201,6 +209,7 @@ function Row({ route, m, index }: { route: string; m: MetricsRouteSummary; index
       exit={{ opacity: 0 }}
       transition={{ delay: Math.min(index * 0.02, 0.2), duration: 0.2 }}
       className="border-b border-border last:border-0 transition-colors hover:bg-[var(--accent-dim)]"
+      style={errored ? { background: "var(--status-error-dim)" } : undefined}
     >
       <td className="px-4 py-3 font-mono text-[length:var(--text-small)] text-foreground">{route}</td>
       <Td>{m.count.toLocaleString()}</Td>
@@ -209,7 +218,7 @@ function Row({ route, m, index }: { route: string; m: MetricsRouteSummary; index
       <Td>{fmtMs(m.max_ms)}</Td>
       <Td>{fmtMs(m.last_ms)}</Td>
       <td className="px-4 py-3 text-right font-mono text-[length:var(--text-small)]"
-          style={{ color: errored ? "#E8002D" : "var(--foreground-dim)" }}>
+          style={{ color: errored ? "var(--status-error)" : "var(--status-ok)" }}>
         <span className="inline-flex items-center gap-1">
           {errored && <AlertTriangle size={12} />}
           {fmtErrorRate(m.error_rate)}
@@ -227,20 +236,13 @@ function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-4 py-3 text-right font-mono text-[length:var(--text-small)] text-foreground">{children}</td>;
 }
 
-function Pill({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-1">
-      {icon}
-      {children}
-    </span>
-  );
-}
-
 function LivePill() {
   return (
-    <span className="readout inline-flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-1 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+    <span className="readout inline-flex items-center gap-2 rounded-sm border px-2.5 py-1 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)]"
+          style={{ borderColor: "var(--status-ok)", background: "var(--status-ok-dim)", color: "var(--status-ok)" }}>
       <motion.span
-        className="block h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
+        className="block h-1.5 w-1.5 rounded-full"
+        style={{ background: "var(--status-ok)" }}
         animate={{ opacity: [0.3, 1, 0.3], scale: [0.85, 1.1, 0.85] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
       />
