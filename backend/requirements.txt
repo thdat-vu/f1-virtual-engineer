@@ -8,7 +8,6 @@ python-dotenv
 google-generativeai
 pydantic
 matplotlib
-seaborn
 requests
 slowapi
 httpx

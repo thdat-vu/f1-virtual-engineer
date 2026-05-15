@@ -1,0 +1,53 @@
+# Source-control + editor
+.git
+.gitignore
+.github
+.idea
+.vscode
+.codex
+.claude
+**/.DS_Store
+
+# Docs and ad-hoc artefacts
+README.md
+*.md
+docs/
+
+# Backend — keep source/runtime, drop everything else
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/data/
+backend/tests/
+backend/.pytest_cache/
+backend/notebooks/
+backend/eval/
+backend/evals/
+backend/migrations/
+backend/scripts/
+backend/infra/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend — drop installed deps + build artefacts so the build is hermetic
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/.env
+frontend/.env.*
+!frontend/.env.local.example
+!frontend/.env.example
+frontend/.vercel/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# Compose stays out of the build context; Dockerfiles must remain
+# inside it so `docker build -f backend/Dockerfile .` can find them.
+docker-compose*.yml
