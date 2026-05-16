@@ -12,7 +12,13 @@ collect_all_files() {
 
 run_backend_checks() {
   echo "[self-qa] Running backend tests..."
-  if PYTHONPATH=backend python3 -m pytest backend/tests >/dev/null 2>&1; then
+  # Detect pytest by importability, not by running the full suite —
+  # using a test run as the "is pytest installed?" probe meant a single
+  # failing test silently flipped us to the unittest fallback (which
+  # collects tests differently and produced its own confusing failures).
+  # The check we actually want — "does pytest exist?" — is answered in
+  # well under 100ms by import.
+  if python3 -c 'import pytest' >/dev/null 2>&1; then
     PYTHONPATH=backend python3 -m pytest backend/tests
   else
     echo "[self-qa] pytest unavailable; falling back to unittest discovery."
@@ -49,11 +55,11 @@ need_frontend=0
 need_skill_validate=0
 need_shell_syntax=0
 
-if printf '%s\n' "$files" | grep -q '^backend/'; then
+if printf '%s\n' "$files" | grep -Eq '^backend/.*\.(py|txt)$|^backend/Dockerfile$'; then
   need_backend=1
 fi
 
-if printf '%s\n' "$files" | grep -q '^frontend/'; then
+if printf '%s\n' "$files" | grep -Eq '^frontend/.*\.(ts|tsx|js|jsx|css|json)$|^frontend/.*\.(config|env)\.[a-z]+$'; then
   need_frontend=1
 fi
 
