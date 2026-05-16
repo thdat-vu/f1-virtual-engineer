@@ -1,23 +1,27 @@
 # ──────────────────────────────────────────────────────────────────────
 # How to bring this up
 # ──────────────────────────────────────────────────────────────────────
-# Compose's auto-loaded `.env` lives next to this file at the repo root,
-# not at `backend/.env`. The redis service interpolates REDIS_PASSWORD
-# at compose-parse time (before any container starts), so you MUST point
-# compose at the file that defines it:
+# Easiest: `make redis-up` from the repo root. It auto-detects which
+# compose flavor you have (`docker compose` plugin vs standalone
+# `docker-compose`) and reads backend/.env for you.
 #
-#   docker compose --env-file backend/.env -f docker-compose.staging.yml up -d redis
+# Manual invocation, if you'd rather not use make:
 #
-# Without --env-file you'll get:
+#   docker-compose --env-file backend/.env -f docker-compose.staging.yml up -d redis
+#   # or, if you have the v2 plugin instead of the standalone binary:
+#   docker compose  --env-file backend/.env -f docker-compose.staging.yml up -d redis
+#
+# Why the --env-file flag is non-optional: compose's auto-loaded `.env`
+# lives next to this file at the repo root, NOT at backend/.env. The
+# redis service interpolates REDIS_PASSWORD at compose-parse time
+# (before any container starts). Without --env-file you'll see:
+#
 #   error while interpolating services.redis.environment.REDIS_PASSWORD:
 #   required variable REDIS_PASSWORD is missing a value
 #
 # The `env_file:` keys on individual services (backend, frontend) only
 # inject env vars INTO those containers at runtime — they do nothing
 # for top-level interpolation like ${REDIS_PASSWORD:?...}.
-#
-# Tip: drop this in your shell profile to avoid retyping the flag:
-#   alias dcs='docker compose --env-file backend/.env -f docker-compose.staging.yml'
 # ──────────────────────────────────────────────────────────────────────
 
 services:
