@@ -1,3 +1,25 @@
+# ──────────────────────────────────────────────────────────────────────
+# How to bring this up
+# ──────────────────────────────────────────────────────────────────────
+# Compose's auto-loaded `.env` lives next to this file at the repo root,
+# not at `backend/.env`. The redis service interpolates REDIS_PASSWORD
+# at compose-parse time (before any container starts), so you MUST point
+# compose at the file that defines it:
+#
+#   docker compose --env-file backend/.env -f docker-compose.staging.yml up -d redis
+#
+# Without --env-file you'll get:
+#   error while interpolating services.redis.environment.REDIS_PASSWORD:
+#   required variable REDIS_PASSWORD is missing a value
+#
+# The `env_file:` keys on individual services (backend, frontend) only
+# inject env vars INTO those containers at runtime — they do nothing
+# for top-level interpolation like ${REDIS_PASSWORD:?...}.
+#
+# Tip: drop this in your shell profile to avoid retyping the flag:
+#   alias dcs='docker compose --env-file backend/.env -f docker-compose.staging.yml'
+# ──────────────────────────────────────────────────────────────────────
+
 services:
   # ──────────────────────────────────────────────────────────────────────
   # Redis — L2 cache + future Celery broker/result backend (#100, #139).

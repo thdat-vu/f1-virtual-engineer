@@ -72,11 +72,18 @@ The goal isn't paranoia — it's that the cheapest paths to root on this stack a
 
 1. `openssl rand -base64 32 | tr -d '=+/' | cut -c1-32` — generate `REDIS_PASSWORD` and (later) `RABBITMQ_DEFAULT_PASS`. Paste into `backend/.env`. Do not check the file in.
 2. Confirm `docker-compose.staging.yml` has no `ports:` mapping on `redis` (and later `rabbitmq`).
-3. `docker compose -f docker-compose.staging.yml up redis` — wait for `healthy`. If it says `unhealthy`, the password env var is missing or the image is the wrong tag.
-4. `docker compose exec redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping` returns `PONG`.
-5. `docker compose exec redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning CONFIG GET maxmemory` should error with `unknown command` — that's the rename working.
-6. From the host: `redis-cli -h 127.0.0.1 -p 6379 ping` should fail (connection refused or timeout). If it succeeds, the port is exposed and step 2 didn't take.
-7. After RabbitMQ lands: same checklist for `5672` and `15672` from the host.
+3. Bring up Redis pointing compose at `backend/.env` explicitly — compose's auto-loaded `.env` lives at the repo root, not at `backend/.env`:
+
+   ```sh
+   docker compose --env-file backend/.env -f docker-compose.staging.yml up -d redis
+   ```
+
+   Missing the `--env-file` flag yields `required variable REDIS_PASSWORD is missing a value`. The `env_file:` keys on individual services inject env vars into containers at runtime; they do not feed compose-time interpolation like `${REDIS_PASSWORD:?...}`.
+4. Wait for `healthy`. If it says `unhealthy`, the password env var is missing or the image is the wrong tag.
+5. `docker compose --env-file backend/.env -f docker-compose.staging.yml exec redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping` returns `PONG`.
+6. Same exec call with `CONFIG GET maxmemory` should error with `unknown command` — that's the rename working.
+7. From the host: `redis-cli -h 127.0.0.1 -p 6379 ping` should fail (connection refused or timeout). If it succeeds, the port is exposed and step 2 didn't take.
+8. After RabbitMQ lands: same checklist for `5672` and `15672` from the host.
 
 ## When to revisit this doc
 
