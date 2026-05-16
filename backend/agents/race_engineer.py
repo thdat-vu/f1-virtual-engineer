@@ -139,6 +139,7 @@ class AgentState(TypedDict):
     overrides: dict[str, Any]
     rationale_source: str  # "llm" or "template"
     citations: list[dict[str, Any]]
+    force_template: bool
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
@@ -424,6 +425,14 @@ def format_response_node(state: AgentState) -> AgentState:
     if _is_short_factual(state):
         return {**state, "response_text": _render_template(state), "rationale_source": "template"}
 
+    # When the caller has opted into the async-rationale path (#139 PR3),
+    # skip the LLM round-trip here and return template synchronously.
+    # The /analyze handler will enqueue a worker task that back-fills the
+    # rationale onto the persisted history row, and the frontend polls
+    # /analyze/history to pick up the upgrade.
+    if state.get("force_template"):
+        return {**state, "response_text": _render_template(state), "rationale_source": "template"}
+
     llm_text = generate_rationale(_build_llm_context(state))
     if llm_text:
         return {**state, "response_text": llm_text, "rationale_source": "llm"}
@@ -502,6 +511,7 @@ def analyze_query(
     *,
     session_override: dict[str, Any] | None = None,
     driver_override: str | None = None,
+    force_template: bool = False,
 ) -> dict[str, Any]:
     import copy
     memory_snapshot = copy.deepcopy(_build_memory_snapshot())
@@ -538,6 +548,7 @@ def analyze_query(
                 "overrides": overrides,
                 "rationale_source": "template",
                 "citations": citations,
+                "force_template": force_template,
             },
             config={"recursion_limit": MAX_GRAPH_STEPS},
         )

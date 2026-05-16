@@ -42,6 +42,7 @@ import os
 
 from celery import Celery, Task
 from celery.exceptions import MaxRetriesExceededError
+from celery.signals import task_success
 from kombu import Exchange, Queue
 
 from tasks.exceptions import PermanentError
@@ -65,7 +66,7 @@ app = Celery(
     "apex",
     broker=os.getenv("CELERY_BROKER_URL", ""),
     backend=os.getenv("CELERY_RESULT_BACKEND", ""),
-    include=["tasks.example", "tasks.dlq_consumer"],
+    include=["tasks.example", "tasks.dlq_consumer", "tasks.rationale"],
 )
 
 
@@ -147,3 +148,28 @@ class TaskWithDLQ(Task):
 
 
 __all__ = ["app", "TaskWithDLQ", "DEFAULT_QUEUE", "DEAD_QUEUE"]
+
+
+@task_success.connect
+def _on_task_success(sender=None, **_kwargs):  # noqa: ANN001
+    """Bump ``workers:completed_24h`` on every successful task.
+
+    Symmetric to ``workers:failed_24h`` (incremented in the DLQ
+    consumer). The ``/metrics`` endpoint reads both. We deliberately
+    skip the DLQ task itself — it processes failures, so counting its
+    own successes would muddle the meaning of "completed".
+    """
+    if sender is None:
+        return
+    if getattr(sender, "name", "") == "tasks.dlq.process_failure":
+        return
+    # Local import to avoid the circular ``tasks <-> tasks.dlq_consumer``
+    # at module-load time.
+    try:
+        from tasks.dlq_consumer import bump_success_counter
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        bump_success_counter()
+    except Exception:  # noqa: BLE001
+        logger.warning("task_success counter bump failed", exc_info=True)

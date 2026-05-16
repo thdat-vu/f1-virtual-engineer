@@ -61,6 +61,24 @@ class TimingMiddlewareTests(unittest.TestCase):
             self.assertIn("last_ms", stats)
             self.assertIn("error_rate", stats)
 
+    def test_metrics_endpoint_includes_workers_block(self):
+        # /metrics must always expose the workers counters with a stable
+        # shape so the frontend can render zeros instead of breaking when
+        # Redis is disabled (which is the case in CI).
+        response = self.client.get("/metrics")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("workers", body)
+        workers = body["workers"]
+        self.assertIn("completed_24h", workers)
+        self.assertIn("failed_24h", workers)
+        self.assertIn("redis_enabled", workers)
+        # CI runs without REDIS_URL so the snapshot is the all-zeros
+        # degraded-mode shape. Asserting on it pins the contract.
+        self.assertEqual(workers["completed_24h"], 0)
+        self.assertEqual(workers["failed_24h"], 0)
+        self.assertFalse(workers["redis_enabled"])
+
     def test_metrics_disabled_via_env(self):
         # Build a fresh app with METRICS_ENABLED=false so the middleware skips work.
         with patch.dict(os.environ, {"METRICS_ENABLED": "false"}):

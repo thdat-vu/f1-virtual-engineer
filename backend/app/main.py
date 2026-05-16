@@ -166,7 +166,47 @@ async def get_metrics():
     return {
         "routes": snapshot_metrics(),
         "cache": {"redis_enabled": redis_cache.is_enabled()},
+        "workers": _snapshot_workers(),
     }
+
+
+def _snapshot_workers() -> dict[str, int | bool]:
+    """Read the rolling 24h Celery counters from Redis (#139 PR3).
+
+    Counters are bumped by the worker on terminal failure
+    (`workers:failed_24h`) and on task success
+    (`workers:completed_24h`). Both have a 24h TTL set on first
+    increment so the snapshot reflects a moving window without us
+    having to schedule a sweeper.
+
+    Degrades silently to zeros when Redis is disabled or unreachable —
+    `/metrics` itself must never 5xx because the counters are missing.
+    """
+    snapshot: dict[str, int | bool] = {
+        "completed_24h": 0,
+        "failed_24h": 0,
+        "redis_enabled": redis_cache.is_enabled(),
+    }
+    if not snapshot["redis_enabled"]:
+        return snapshot
+    try:
+        client = redis_cache._get_client()
+        if client is None:
+            return snapshot
+        for key, label in (
+            ("workers:completed_24h", "completed_24h"),
+            ("workers:failed_24h", "failed_24h"),
+        ):
+            raw = client.get(key)
+            if raw is None:
+                continue
+            try:
+                snapshot[label] = int(raw)
+            except (TypeError, ValueError):
+                continue
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("Failed to read worker counters from Redis", exc_info=True)
+    return snapshot
 
 
 @app.get(
@@ -229,20 +269,33 @@ async def analyze_race_data(
     body: AnalyzeRequest,
     user_id: str | None = Depends(get_optional_user_id),
 ):
+    # Async-rationale path is opt-in (#139 PR3). It only triggers when:
+    #   1. The env flag is on, AND
+    #   2. The caller is authenticated (we need a persisted row to back-fill)
+    # Anonymous callers always get the synchronous LLM path so they don't
+    # see a degraded "template-only" response with no upgrade route.
+    rationale_async = (
+        os.environ.get("RATIONALE_ASYNC", "").strip().lower() in {"1", "true", "yes", "on"}
+        and user_id is not None
+    )
+
     session_override = body.session_info.model_dump() if body.session_info else None
     result = await asyncio.to_thread(
         analyze_query,
         body.query,
         session_override=session_override,
         driver_override=body.driver,
+        force_template=rationale_async,
     )
 
+    rationale_job_id: str | None = None
     if user_id and not result.get("error"):
         intent = result.get("intent") or {}
-        # Fire-and-forget so a slow/failing PostgREST call never blocks the
-        # /analyze response. The persistence helper is itself fail-closed.
-        asyncio.create_task(
-            insert_analyze_history(
+        if rationale_async:
+            # Synchronous insert: we need the row id to hand to the worker.
+            # The fail-closed helper still won't raise — it returns None on
+            # outage and we just skip the enqueue.
+            row_id = await insert_analyze_history(
                 user_id=user_id,
                 query=body.query,
                 driver=intent.get("driver") or body.driver,
@@ -251,10 +304,54 @@ async def analyze_race_data(
                 session_type=intent.get("session_type")
                     or (body.session_info.session_type if body.session_info else None),
                 agent_response=result["response_text"],
-                rationale_source=result.get("rationale_source", "template"),
+                rationale_source="template",
                 intent_type=intent.get("intent_type"),
             )
-        )
+            if row_id:
+                try:
+                    # Local import: keeps tasks/* off the import path of any
+                    # caller that doesn't run the async path (and makes it
+                    # cheap to monkeypatch in tests).
+                    from tasks.rationale import backfill_rationale
+
+                    llm_context = {
+                        "intent": intent,
+                        "telemetry_data": result.get("telemetry_data") or {},
+                        "strategy_data": result.get("strategy_data") or {},
+                        "citations": [
+                            {k: v for k, v in c.items() if k != "score"}
+                            for c in (result.get("citations") or [])
+                        ],
+                    }
+                    async_result = backfill_rationale.delay(
+                        row_id=row_id,
+                        user_id=user_id,
+                        llm_context=llm_context,
+                    )
+                    rationale_job_id = async_result.id
+                except Exception:  # noqa: BLE001
+                    # A broker outage must never break /analyze. We still
+                    # have the row persisted with rationale_source='template';
+                    # the upgrade just won't happen this time.
+                    _logger.warning("Failed to enqueue rationale backfill", exc_info=True)
+        else:
+            # Fire-and-forget so a slow/failing PostgREST call never blocks
+            # the /analyze response. The persistence helper is itself
+            # fail-closed.
+            asyncio.create_task(
+                insert_analyze_history(
+                    user_id=user_id,
+                    query=body.query,
+                    driver=intent.get("driver") or body.driver,
+                    event=intent.get("event") or (body.session_info.event if body.session_info else None),
+                    year=intent.get("year") or (body.session_info.year if body.session_info else None),
+                    session_type=intent.get("session_type")
+                        or (body.session_info.session_type if body.session_info else None),
+                    agent_response=result["response_text"],
+                    rationale_source=result.get("rationale_source", "template"),
+                    intent_type=intent.get("intent_type"),
+                )
+            )
 
     return {
         "status": "error" if result.get("error") else "success",
@@ -264,6 +361,7 @@ async def analyze_race_data(
         "telemetry_data": result["telemetry_data"],
         "strategy_data": result.get("strategy_data"),
         "rationale_source": result.get("rationale_source", "template"),
+        "rationale_job_id": rationale_job_id,
         "error": result["error"],
         "memory": result.get("memory"),
         "execution": result.get("execution"),

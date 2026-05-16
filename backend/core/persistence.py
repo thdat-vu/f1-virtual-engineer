@@ -78,16 +78,22 @@ async def insert_analyze_history(
     agent_response: str,
     rationale_source: str,
     intent_type: str | None,
-) -> None:
-    """Insert one row into ``analyze_history``. Fail-closed: never raises."""
+) -> str | None:
+    """Insert one row into ``analyze_history``. Fail-closed: never raises.
+
+    Returns the new row's ``id`` on success so the async-rationale path
+    (#139 PR3) can hand it to the worker for back-fill. Returns ``None``
+    when persistence is unconfigured or the insert fails — fire-and-
+    forget callers can keep ignoring the return value.
+    """
     try:
         client = await _get_client()
     except Exception:  # noqa: BLE001 — fail-closed
         _logger.warning("Failed to initialise persistence client", exc_info=True)
-        return
+        return None
     if client is None:
         _logger.debug("Supabase persistence not configured; skipping history insert")
-        return
+        return None
     payload = {
         "user_id": user_id,
         "query": query,
@@ -100,10 +106,12 @@ async def insert_analyze_history(
         "intent_type": intent_type,
     }
     try:
+        # ``Prefer: return=representation`` makes PostgREST echo the inserted
+        # row(s). We need it for the row id; the response body is small.
         response = await client.post(
             "/analyze_history",
             json=payload,
-            headers={"Prefer": "return=minimal"},
+            headers={"Prefer": "return=representation"},
         )
         if response.status_code >= 400:
             _logger.warning(
@@ -111,8 +119,67 @@ async def insert_analyze_history(
                 response.status_code,
                 response.text[:300],
             )
+            return None
+        body = response.json()
+        if isinstance(body, list) and body and isinstance(body[0], dict):
+            row_id = body[0].get("id")
+            return str(row_id) if row_id is not None else None
+        return None
     except Exception:  # noqa: BLE001 — fail-closed
         _logger.warning("PostgREST insert raised; swallowing", exc_info=True)
+        return None
+
+
+async def update_analyze_history_rationale(
+    *,
+    user_id: str,
+    row_id: str,
+    rationale_text: str,
+) -> bool:
+    """Back-fill ``rationale_text`` + flip ``rationale_source`` to ``"llm"``.
+
+    Idempotent: filters on ``rationale_source=eq.template`` so a
+    re-delivered Celery task can't double-write or clobber a freshly
+    refreshed value. Returns ``True`` when a row was actually updated,
+    ``False`` otherwise (already upgraded, missing, or persistence
+    disabled).
+    """
+    try:
+        client = await _get_client()
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("Failed to initialise persistence client", exc_info=True)
+        return False
+    if client is None:
+        return False
+    try:
+        response = await client.patch(
+            "/analyze_history",
+            params={
+                "id": f"eq.{row_id}",
+                "user_id": f"eq.{user_id}",
+                "rationale_source": "eq.template",
+            },
+            json={
+                "rationale_text": rationale_text,
+                "rationale_source": "llm",
+            },
+            headers={"Prefer": "return=representation"},
+        )
+        if response.status_code >= 400:
+            _logger.warning(
+                "PostgREST update failed (status=%s body=%r)",
+                response.status_code,
+                response.text[:300],
+            )
+            return False
+        body = response.json()
+        # Empty list -> the WHERE didn't match (already upgraded or row
+        # removed). Treating that as "not updated" is what we want for
+        # idempotency.
+        return isinstance(body, list) and len(body) > 0
+    except Exception:  # noqa: BLE001 — fail-closed
+        _logger.warning("PostgREST update raised; swallowing", exc_info=True)
+        return False
 
 
 async def list_analyze_history(*, user_id: str, limit: int = 20) -> list[dict[str, Any]]:

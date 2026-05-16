@@ -86,6 +86,13 @@ class AnalyzeResponse(BaseModel):
         default="template",
         description="Whether `agent_response` came from the Gemini LLM path or the deterministic template fallback.",
     )
+    rationale_job_id: str | None = Field(
+        default=None,
+        description=(
+            "Set only when `RATIONALE_ASYNC=true` and a worker has been queued to back-fill an LLM rationale onto the persisted history row. "
+            "Frontends can poll `/analyze/history` and watch for the row's `rationale_source` to flip from `template` to `llm`."
+        ),
+    )
     error: str | None = None
     memory: AnalyzeMemory | None = None
     execution: AnalyzeExecution | None = None
