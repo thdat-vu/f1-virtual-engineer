@@ -36,7 +36,8 @@ To ensure maintainability and scalability, this project uses a monorepo structur
     * `eval/`: Golden sets and evaluation scripts.
     * `infra/`: Docker, environment variables, and config.
 * **`frontend/`**: Next.js Dashboard for real-time visualization.
-* **`docker-compose.yml`**: Full system containerization.
+* **`docker-compose.staging.yml`**: Staging-like containerization (api + frontend + redis). See "Staging-like Docker Compose" below.
+* **`Makefile`**: One-shot dev helpers — `make dev`, `make redis-up`, `make redis-status`, etc.
 
 ---
 
@@ -102,32 +103,94 @@ Each fixture asserts that every `expected_substrings` entry appears in the gener
 
 ## Getting Started
 
-The system is containerized for seamless local development, optimized for Apple Silicon (M-series) and cloud deployments.
+Two supported paths: local dev (fastest feedback loop) and the staging-like Docker Compose stack (closer to what runs on the VPS).
 
 ### Prerequisites
-* Docker & Docker Compose
 * Python 3.11+
 * Node.js 18+
+* Docker + Docker Compose — only needed for Redis or the full staging stack. Either `docker compose` (v2 plugin) or `docker-compose` (v1 standalone) works; the Makefile auto-detects.
 
-### Installation Steps
+### 1. Clone & configure environment
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/your-username/f1-virtual-engineer.git](https://github.com/your-username/f1-virtual-engineer.git)
-    cd f1-virtual-engineer
-    ```
+```bash
+git clone https://github.com/thdat-vu/f1-virtual-engineer.git
+cd f1-virtual-engineer
 
-2.  **Environment Setup:**
-    * Backend: `cp backend/.env.example backend/.env`
-    * Frontend: `cp frontend/.env.local.example frontend/.env.local`
-    * Add your required API keys (e.g., Gemini API, Supabase) and backend URL for frontend API calls.
+cp backend/.env.example backend/.env
+cp frontend/.env.local.example frontend/.env.local
+```
 
-3.  **Run with Docker:**
-    ```bash
-    docker-compose up --build
-    ```
-    * *The Backend will be available at `http://localhost:8000`*
-    * *The Frontend will be available at `http://localhost:3000`*
+Fill in `backend/.env`:
+- `GEMINI_API_KEY` — required for LLM rationale; without it the deterministic template fallback is used.
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — optional, only needed for auth + per-user history.
+- `REDIS_PASSWORD` — required if you bring up Redis. Generate with:
+  ```bash
+  openssl rand -base64 32 | tr -d '=+/' | cut -c1-32
+  ```
+- `REDIS_URL` — point at the Redis you bring up (`redis://:<password>@redis:6379/0` for compose, `redis://127.0.0.1:6379/0` for a host-installed Redis). Leave blank to skip the L2 cache and use in-process only.
+
+### 2. Local dev (recommended for iterating)
+
+```bash
+make dev
+```
+
+That runs `scripts/dev.sh`, which:
+- creates `.venv` + installs `backend/requirements.txt` if needed,
+- runs `npm install` in `frontend/` if `node_modules/` is missing,
+- pre-flights ports 3000 + 8000 (a stale `next-server` or `uvicorn` from a previous session prints its PID + a ready-to-paste `kill` command instead of failing mid-startup),
+- starts both processes and tears them down together on Ctrl-C.
+
+URLs:
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:8000>
+- Swagger / OpenAPI: <http://localhost:8000/docs>
+
+### 3. Optional: bring up Redis for the L2 cache
+
+Most code paths work fine without Redis (the L1 in-process TTLCache covers a single-process dev loop). Bring up Redis when you want to test multi-worker cache behavior, or before working on anything in `backend/core/redis_cache.py`.
+
+```bash
+make redis-up        # starts the redis container (uses backend/.env)
+make redis-status    # confirm "(healthy)"
+make redis-cli       # opens an authed redis-cli inside the container
+make redis-down      # stops the stack
+make redis-logs      # tail the redis container logs
+```
+
+The Makefile auto-detects whether you have `docker compose` (v2 plugin) or `docker-compose` (v1 standalone) and picks the right one. If `make redis-up` errors, the message tells you exactly what's missing (the file, the password, etc.).
+
+> **Hardening note:** Redis is bound to the docker network only (no host port mapping), `requirepass` is mandatory, persistence is off, and admin commands like `CONFIG`/`FLUSHALL`/`FLUSHDB` are renamed. See [`docs/INFRA_HARDENING.md`](docs/INFRA_HARDENING.md) for the threat model and operator checklist.
+
+### 4. Full staging-like stack with Docker Compose
+
+For a reviewer-friendly run that mirrors production (api + frontend + redis behind a single docker network):
+
+```bash
+# v2 plugin:
+docker compose  --env-file backend/.env -f docker-compose.staging.yml up --build
+# v1 standalone:
+docker-compose --env-file backend/.env -f docker-compose.staging.yml up --build
+```
+
+Why the `--env-file backend/.env` flag matters: compose's auto-loaded `.env` lives at the **project root**, not at `backend/.env`. The `redis` service interpolates `${REDIS_PASSWORD:?...}` at compose-parse time (before any container starts), so without the flag you'll see `required variable REDIS_PASSWORD is missing a value`. The `env_file:` keys on `backend`/`frontend` only inject vars into those containers at runtime — they do nothing for top-level interpolation.
+
+Expected URLs:
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:8000>
+- Swagger UI: <http://localhost:8000/docs>
+
+Stop the stack:
+
+```bash
+docker compose --env-file backend/.env -f docker-compose.staging.yml down
+# or just: make redis-down  (does the same thing)
+```
+
+Notes:
+- For local dev outside Docker, `frontend/.env.local` keeps `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
+- For the staging compose, browser requests go to `NEXT_PUBLIC_API_BASE_URL=/api` and Next.js rewrites `/api/*` to the internal backend URL via `BACKEND_INTERNAL_URL=http://backend:8000`.
+- FastF1 cache is mounted through `./backend/data` so repeated runs are faster.
 
 ### Authentication (Supabase + Google)
 
@@ -171,38 +234,6 @@ Recommended fastest path after this issue lands:
 - keep GitHub Actions as CI
 - deploy frontend + backend on Railway or Render
 - use the platform-generated URL first, add custom domain later
-
-### Staging-like Docker Compose
-
-For a first-publish / reviewer-friendly run path, the repo now includes a staging-like compose file:
-
-```bash
-docker compose -f docker-compose.staging.yml up --build
-```
-
-Expected URLs after startup:
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-
-Before first run, make sure these files exist:
-
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.local.example frontend/.env.local
-```
-
-Notes:
-- For plain local dev outside Docker, `frontend/.env.local` can keep `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
-- For staging-like Docker Compose, browser requests should go to `NEXT_PUBLIC_API_BASE_URL=/api`.
-- Inside Docker Compose, Next.js rewrites `/api/*` to the internal backend URL from `BACKEND_INTERNAL_URL=http://backend:8000`.
-- FastF1 cache is mounted through `./backend/data` so repeated runs are faster.
-
-To stop the stack:
-
-```bash
-docker compose -f docker-compose.staging.yml down
-```
 
 ### API Docs (Swagger / OpenAPI)
 
