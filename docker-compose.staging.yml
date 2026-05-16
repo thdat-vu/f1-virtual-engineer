@@ -92,6 +92,74 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in backend/.env}"
     # No `ports:` block on purpose — see hardening note 1 above.
 
+  # ──────────────────────────────────────────────────────────────────────
+  # RabbitMQ — Celery broker for the async task pipeline (#139).
+  #
+  # Hardening checklist:
+  # 1. NO host port mapping for 5672 (AMQP) or 15672 (management UI). The
+  #    docker network is the only path to either. If you need the UI for
+  #    a demo, tunnel it: `ssh -L 15672:localhost:15672 vps`.
+  # 2. Default `guest` user is left at its built-in `loopback_users.guest`
+  #    setting (only reachable from localhost inside the container). We
+  #    don't disable that — every tutorial that does is wrong.
+  # 3. A dedicated `apex` user + `apex` vhost are created on first boot
+  #    via the RABBITMQ_DEFAULT_* env vars. The Celery app + worker only
+  #    ever talk through this user.
+  # 4. Persistent volume so messages survive a container restart. RabbitMQ
+  #    tries to keep this lean (queue messages only, no payload bloat),
+  #    but watch disk if traffic spikes — see docs/INFRA_HARDENING.md Q4.
+  # 5. Healthcheck uses `rabbitmq-diagnostics check_running` which is the
+  #    cheapest one Erlang exposes — `ping` allocates more.
+  # ──────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "apex"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set in backend/.env}"
+      RABBITMQ_DEFAULT_VHOST: "apex"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Celery worker — consumes the apex vhost, runs registered tasks.
+  #
+  # Same image as backend (no rebuild), CMD swapped to celery. The
+  # `--without-heartbeat --without-mingle --without-gossip` flags trim
+  # ~30MB of resident memory per worker by skipping cluster-discovery
+  # protocols we don't use (single-node deploy).
+  # ──────────────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - backend/.env
+    command:
+      - "celery"
+      - "-A"
+      - "tasks"
+      - "worker"
+      - "--loglevel=info"
+      - "--concurrency=2"
+      - "--without-heartbeat"
+      - "--without-mingle"
+      - "--without-gossip"
+    volumes:
+      - ./backend/data:/app/backend/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -104,6 +172,8 @@ services:
       - ./backend/data:/app/backend/data
     depends_on:
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
 
@@ -124,3 +194,6 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+
+volumes:
+  rabbitmq-data:

@@ -22,3 +22,8 @@ redis
 # us cover the L2 cache wiring in CI without provisioning a real Redis.
 fakeredis
 rank-bm25
+# celery for the async task pipeline (#139). amqp transport ships in
+# the base wheel; broker is RabbitMQ in compose, result backend is the
+# same Redis as the L2 cache (different DB index — see
+# backend/tasks/__init__.py).
+celery
