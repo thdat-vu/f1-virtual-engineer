@@ -104,7 +104,7 @@ export default function AdminPage() {
       <header className="sticky top-0 z-40 border-b border-border bg-overlay backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <Link href="/" className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-widest)] text-foreground-dim transition-colors hover:text-foreground">
-            ← Apex Intelligence
+            ← Back to home
           </Link>
           <LivePill />
         </div>

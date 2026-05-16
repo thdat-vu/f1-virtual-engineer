@@ -1,4 +1,4 @@
-# Scratchpad - Apex-Intelligence
+# Scratchpad - F1 Virtual Engineer
 
 ## Current Task
 - Completed Cursor workflow optimization.

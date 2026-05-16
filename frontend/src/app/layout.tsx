@@ -3,18 +3,18 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SupabaseProvider } from "@/components/auth/SupabaseProvider";
 
-const siteTitle = "Apex Intelligence | Virtual F1 Race Engineer";
+const siteTitle = "F1 Virtual Engineer";
 const siteDescription =
   "Mission-control UX for telemetry analysis, pit-window reasoning, and explainable Formula 1 strategy signals.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://apex-intelligence.local"),
+  metadataBase: new URL("https://f1-virtual-engineer.local"),
   title: {
     default: siteTitle,
-    template: "%s | Apex Intelligence",
+    template: "%s | F1 Virtual Engineer",
   },
   description: siteDescription,
-  applicationName: "Apex Intelligence",
+  applicationName: "F1 Virtual Engineer",
   keywords: [
     "Formula 1",
     "F1 telemetry",
@@ -23,20 +23,15 @@ export const metadata: Metadata = {
     "motorsport strategy",
     "mission control",
   ],
-  icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico" },
-      { url: "/icon.png", type: "image/png", sizes: "256x256" },
-    ],
-    apple: [{ url: "/apple-icon.png", sizes: "256x256", type: "image/png" }],
-    shortcut: ["/favicon.svg"],
-  },
+  // icons: omitted on purpose. The Next.js App Router file convention
+  // picks up `app/icon.png` + `app/apple-icon.png` automatically and
+  // injects the right <link> tags. Listing icons here too produces
+  // duplicate or conflicting entries.
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: siteTitle,
     description: siteDescription,
-    siteName: "Apex Intelligence",
+    siteName: "F1 Virtual Engineer",
     type: "website",
   },
   twitter: {

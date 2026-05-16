@@ -1,4 +1,4 @@
-# Apex-Intelligence: Virtual Engineer F1
+# F1 Virtual Engineer
 
 [![CI](https://github.com/thdat-vu/f1-virtual-engineer/actions/workflows/ci.yml/badge.svg)](https://github.com/thdat-vu/f1-virtual-engineer/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
@@ -7,7 +7,7 @@
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**Apex-Intelligence** is an end-to-end Agentic AI system designed to act as a virtual Formula 1 race engineer. This system leverages advanced Large Language Models to process real-time telemetry, retrieve historical race data, and provide strategic recommendations such as pit-stop timing (undercut/overcut) and tire degradation analysis.
+An end-to-end agentic AI system that acts as a virtual Formula 1 race engineer. It processes telemetry, retrieves historical race data, and produces strategy recommendations — pit-stop timing (undercut/overcut), tire-degradation analysis, explainable race calls.
 
 ---
 
@@ -225,7 +225,7 @@ If your goal is to let the first real user open a browser URL and try the produc
    - use the new Dockerfiles or the compose setup as the deployment base
 
 3. **Expose one public staging URL**
-   - example: `https://staging.apex-intelligence.app`
+   - example: `https://staging.f1-virtual-engineer.app`
    - ask first users to try 2-3 suggested prompts from the landing page / mission-control flow
 
 Important note: GitHub Actions alone does **not** host the app permanently. It is best used as CI, or as a trigger to deploy to a hosting platform that gives you the actual public URL.

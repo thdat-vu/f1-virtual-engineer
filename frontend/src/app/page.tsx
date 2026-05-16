@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
 import { LandingCTA } from "@/components/landing/LandingCTA";
@@ -17,15 +18,20 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-border bg-overlay backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-accent text-[0.85rem] font-black italic text-background">
-              A
-            </div>
+            <Image
+              src="/icon.png"
+              alt="F1 Virtual Engineer"
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-8 rounded-sm"
+            />
             <div>
               <p className="text-[0.7rem] font-bold uppercase tracking-[var(--track-wide)] text-foreground">
-                Apex Intelligence
+                F1 Virtual Engineer
               </p>
               <p className="readout text-[0.55rem] uppercase tracking-[var(--track-widest)] text-foreground-dim">
-                Virtual F1 Race Engineer
+                Telemetry · Strategy · Explainable AI
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-## Cursor setup for Apex-Intelligence
+## Cursor setup for F1 Virtual Engineer
 
 This `.cursor` setup is adapted from ideas in [everything-claude-code](https://github.com/affaan-m/everything-claude-code) and tuned for this repository's current state:
 

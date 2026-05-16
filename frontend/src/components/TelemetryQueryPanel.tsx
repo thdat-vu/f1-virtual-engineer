@@ -698,7 +698,7 @@ function TutorialOverlay({ onClose }: { onClose: () => void }) {
             System Orientation
           </p>
           <h2 className="mt-4 text-3xl font-bold text-white uppercase tracking-tight">
-            How to operate Apex Intelligence
+            How to operate the engineer
           </h2>
         </div>
 

@@ -1,4 +1,4 @@
-# Apex-Intelligence Agent Mandates
+# F1 Virtual Engineer Agent Mandates
 
 > **CRITICAL PRECEDENCE**: This project uses a centralized control system.
 > All foundational mandates, skills, and automation flows are now located in the **`.gemini/`** folder.

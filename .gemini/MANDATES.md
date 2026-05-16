@@ -1,4 +1,4 @@
-# Apex-Intelligence: Hierarchical Mandates
+# F1 Virtual Engineer: Hierarchical Mandates
 
 > Based on ECC (Everything Claude Code) Best Practices.
 

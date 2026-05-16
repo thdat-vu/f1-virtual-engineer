@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Apex Intelligence",
-    short_name: "Apex F1",
+    name: "F1 Virtual Engineer",
+    short_name: "F1 VE",
     description:
       "Virtual F1 race engineer for telemetry, strategy signals, and explainable mission-control workflows.",
     start_url: "/",
@@ -12,13 +12,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#05070b",
     icons: [
       {
-        src: "/icon",
-        sizes: "64x64",
+        src: "/icon.png",
+        sizes: "1254x1254",
         type: "image/png",
       },
       {
-        src: "/apple-icon",
-        sizes: "180x180",
+        src: "/apple-icon.png",
+        sizes: "1254x1254",
         type: "image/png",
       },
     ],

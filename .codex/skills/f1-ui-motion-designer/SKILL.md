@@ -1,6 +1,11 @@
+---
+name: f1-ui-motion-designer
+description: Apply Apple-meets-automotive UI/UX direction when designing or refining the F1 Virtual Engineer interface — typography, glass surfaces, telemetry-as-hero composition, motion choreography. Use when a task touches landing pages, mission-control layouts, dashboard panels, telemetry visualizations, or any user-facing surface where visual hierarchy and motion timing matter.
+---
+
 # Skill: F1 UI/UX Motion Designer (Apple x Automotive Edition)
 
-Expert guide for transforming the Apex-Intelligence interface into a high-precision "Operator Surface".
+Expert guide for transforming the F1 Virtual Engineer interface into a high-precision "Operator Surface".
 
 ## Design Philosophy: "Surgical Mission Control"
 - **Data as the Hero**: AI does not "talk", it "annotates". Telemetry charts (FastF1) are the primary visual, AI insights are HUD overlays.

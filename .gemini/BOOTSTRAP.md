@@ -1,6 +1,6 @@
 # Gemini Bootstrap: Auto-Load Protocol
 
-This folder contains the operating system for Gemini within the Apex-Intelligence project.
+This folder contains the operating system for Gemini within the F1 Virtual Engineer project.
 
 ## Initialization Sequence
 Every time a new session starts, the Agent MUST:

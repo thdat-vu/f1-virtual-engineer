@@ -1,7 +1,7 @@
-# Apex-Intelligence: Project Specification (Agent-Ready)
+# F1 Virtual Engineer: Project Specification (Agent-Ready)
 
 ## Overview
-**Apex-Intelligence** is an Agentic AI system designed to function as a Virtual F1 Race Engineer. It processes real-time telemetry, historical data, and race conditions to provide strategic insights (e.g., pit windows, tire degradation, undercut/overcut predictions).
+**F1 Virtual Engineer** is an Agentic AI system designed to function as a Virtual F1 Race Engineer. It processes real-time telemetry, historical data, and race conditions to provide strategic insights (e.g., pit windows, tire degradation, undercut/overcut predictions).
 
 ## Architecture: Monorepo Structure
 The project is structured to separate AI reasoning (Backend) from visualization (Frontend).

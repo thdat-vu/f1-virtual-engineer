@@ -58,7 +58,7 @@ export function LandingHero() {
 
           <FadeUp delay={0.16}>
             <p className="mb-10 max-w-xl text-[length:var(--text-body)] leading-7 text-foreground-dim">
-              Apex Intelligence turns Formula 1 session data into explainable pit-window,
+              Turn Formula 1 session data into explainable pit-window,
               tyre-decay, and undercut insight — built for solo devs demoing real agentic AI.
             </p>
           </FadeUp>

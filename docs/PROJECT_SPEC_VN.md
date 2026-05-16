@@ -1,7 +1,7 @@
-# Apex-Intelligence: Tài liệu Đặc tả Dự án (Agent-Ready)
+# F1 Virtual Engineer: Tài liệu Đặc tả Dự án (Agent-Ready)
 
 ## Tổng quan
-**Apex-Intelligence** là một hệ thống Agentic AI được thiết kế để đóng vai trò là Kỹ sư Đua xe Ảo (Virtual F1 Race Engineer). Hệ thống xử lý dữ liệu viễn thám (telemetry) thời gian thực, dữ liệu lịch sử và điều kiện đường đua để đưa ra các phân tích chiến thuật (ví dụ: thời điểm vào pit, độ mòn lốp, dự đoán undercut/overcut).
+**F1 Virtual Engineer** là một hệ thống Agentic AI được thiết kế để đóng vai trò là Kỹ sư Đua xe Ảo (Virtual F1 Race Engineer). Hệ thống xử lý dữ liệu viễn thám (telemetry) thời gian thực, dữ liệu lịch sử và điều kiện đường đua để đưa ra các phân tích chiến thuật (ví dụ: thời điểm vào pit, độ mòn lốp, dự đoán undercut/overcut).
 
 ## Kiến trúc: Cấu trúc Monorepo
 Dự án được cấu trúc để tách biệt phần tư duy AI (Backend) và phần hiển thị giao diện (Frontend).
