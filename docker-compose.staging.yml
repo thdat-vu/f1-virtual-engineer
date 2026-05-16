@@ -148,11 +148,44 @@ services:
       - "worker"
       - "--loglevel=info"
       - "--concurrency=2"
+      - "--queues=apex.tasks"
       - "--without-heartbeat"
       - "--without-mingle"
       - "--without-gossip"
     volumes:
       - ./backend/data:/app/backend/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────
+  # DLQ worker — consumes the dead-letter queue exclusively (#139 PR2).
+  #
+  # Stays on its own container so a flood of dead letters can't starve
+  # the main worker pool, and so a regression in the DLQ consumer can't
+  # take down regular task processing. Concurrency 1 — DLQ traffic is
+  # always low-volume and order-preserving makes log timelines readable.
+  # ──────────────────────────────────────────────────────────────────────
+  dlq-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - backend/.env
+    command:
+      - "celery"
+      - "-A"
+      - "tasks"
+      - "worker"
+      - "--loglevel=info"
+      - "--concurrency=1"
+      - "--queues=apex.tasks.dead"
+      - "--without-heartbeat"
+      - "--without-mingle"
+      - "--without-gossip"
     depends_on:
       redis:
         condition: service_healthy
