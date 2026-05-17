@@ -36,8 +36,8 @@ To ensure maintainability and scalability, this project uses a monorepo structur
     * `eval/`: Golden sets and evaluation scripts.
     * `infra/`: Docker, environment variables, and config.
 * **`frontend/`**: Next.js Dashboard for real-time visualization.
-* **`docker-compose.staging.yml`**: Staging-like containerization (api + frontend + redis). See "Staging-like Docker Compose" below.
-* **`Makefile`**: One-shot dev helpers — `make dev`, `make redis-up`, `make redis-status`, etc.
+* **`docker-compose.staging.yml`**: Staging-like containerization (api + frontend + redis + rabbitmq + celery worker + dlq-worker). See "Staging-like Docker Compose" below.
+* **`Makefile`**: One-shot dev helpers — `make dev`, `make redis-up`, `make stack-up`, etc.
 
 ---
 
@@ -166,7 +166,20 @@ The Makefile auto-detects whether you have `docker compose` (v2 plugin) or `dock
 
 ### 4. Full staging-like stack with Docker Compose
 
-For a reviewer-friendly run that mirrors production (api + frontend + redis behind a single docker network):
+For a reviewer-friendly run that mirrors production (api + frontend + redis + rabbitmq + celery worker + dlq-worker behind a single docker network):
+
+```bash
+make stack-up        # builds + starts every service
+make stack-status    # confirms each container is healthy
+make stack-logs      # follow combined logs (Ctrl-C to detach)
+make worker-logs     # just the celery worker
+make dlq-logs        # just the dead-letter consumer
+make stack-down      # stops the stack
+```
+
+Both `REDIS_PASSWORD` and `RABBITMQ_PASSWORD` must be set in `backend/.env` first — the Makefile pre-flights and tells you exactly which one is missing instead of letting compose print its opaque interpolation error.
+
+If you'd rather invoke compose directly:
 
 ```bash
 # v2 plugin:
@@ -185,8 +198,8 @@ Expected URLs:
 Stop the stack:
 
 ```bash
-docker compose --env-file backend/.env -f docker-compose.staging.yml down
-# or just: make redis-down  (does the same thing)
+make stack-down
+# or directly: docker compose --env-file backend/.env -f docker-compose.staging.yml down
 ```
 
 Notes:
