@@ -249,37 +249,84 @@ function WorkersBlock({
   const completed = workers.completed_24h;
   const failedStatus: "ok" | "warn" = failed > 0 ? "warn" : "ok";
   const redisStatus: "ok" | "warn" = workers.redis_enabled ? "ok" : "warn";
+  const dlqStatus: "ok" | "warn" = workers.dlq_size > 0 ? "warn" : "ok";
+  const brokerStatus: "ok" | "warn" = workers.broker_reachable ? "ok" : "warn";
+  const queueStatus: "ok" | "warn" =
+    !workers.broker_reachable || workers.queue_depth > 50 ? "warn" : "ok";
 
   return (
-    <div className="mb-6">
-      <p className="label mb-3 flex items-center gap-2">
-        <Activity size={12} /> Workers · last 24h
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <WorkerCard
-          icon={<CheckCircle2 size={14} />}
-          label="Completed"
-          value={completed.toLocaleString()}
-          status="ok"
-        />
-        <WorkerCard
-          icon={<XCircle size={14} />}
-          label="Failed"
-          value={failed.toLocaleString()}
-          status={failedStatus}
-        />
-        <WorkerCard
-          icon={<Database size={14} />}
-          label="Redis backend"
-          value={workers.redis_enabled ? "enabled" : "disabled"}
-          status={redisStatus}
-        />
+    <div className="mb-6 space-y-4">
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="label flex items-center gap-2">
+            <Activity size={12} /> Workers · last 24h
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <WorkerCard
+            icon={<CheckCircle2 size={14} />}
+            label="Completed"
+            value={completed.toLocaleString()}
+            status="ok"
+          />
+          <WorkerCard
+            icon={<XCircle size={14} />}
+            label="Failed"
+            value={failed.toLocaleString()}
+            status={failedStatus}
+          />
+          <WorkerCard
+            icon={<Database size={14} />}
+            label="Redis backend"
+            value={workers.redis_enabled ? "enabled" : "disabled"}
+            status={redisStatus}
+          />
+        </div>
+        {!workers.redis_enabled && (
+          <p className="readout mt-2 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+            Counters reset on backend restart — set <code className="font-mono">REDIS_URL</code> for 24h persistence.
+          </p>
+        )}
       </div>
-      {!workers.redis_enabled && (
-        <p className="readout mt-2 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
-          Counters reset on backend restart — set <code className="font-mono">REDIS_URL</code> for 24h persistence.
-        </p>
-      )}
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="label flex items-center gap-2">
+            <Activity size={12} /> Workers · live (broker)
+          </p>
+          <span
+            className="status-pill"
+            data-status={brokerStatus}
+          >
+            broker · {workers.broker_reachable ? "reachable" : "unreachable"}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <WorkerCard
+            icon={<TrendingUp size={14} />}
+            label="Queue depth"
+            value={workers.queue_depth.toLocaleString()}
+            status={queueStatus}
+          />
+          <WorkerCard
+            icon={<Activity size={14} />}
+            label="In flight"
+            value={workers.in_flight.toLocaleString()}
+            status="ok"
+          />
+          <WorkerCard
+            icon={<AlertTriangle size={14} />}
+            label="DLQ size"
+            value={workers.dlq_size.toLocaleString()}
+            status={dlqStatus}
+          />
+        </div>
+        {!workers.broker_reachable && (
+          <p className="readout mt-2 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+            RabbitMQ Management API unreachable — set <code className="font-mono">RABBITMQ_PASSWORD</code> + bring up the broker via <code className="font-mono">make stack-up</code> to populate live counters.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

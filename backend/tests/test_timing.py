@@ -64,20 +64,30 @@ class TimingMiddlewareTests(unittest.TestCase):
     def test_metrics_endpoint_includes_workers_block(self):
         # /metrics must always expose the workers counters with a stable
         # shape so the frontend can render zeros instead of breaking when
-        # Redis is disabled (which is the case in CI).
+        # Redis or the broker is unreachable (which is the case in CI).
         response = self.client.get("/metrics")
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertIn("workers", body)
         workers = body["workers"]
+        # 24h Redis-backed counters
         self.assertIn("completed_24h", workers)
         self.assertIn("failed_24h", workers)
         self.assertIn("redis_enabled", workers)
-        # CI runs without REDIS_URL so the snapshot is the all-zeros
-        # degraded-mode shape. Asserting on it pins the contract.
+        # Live broker stats (#139 PR6)
+        self.assertIn("queue_depth", workers)
+        self.assertIn("in_flight", workers)
+        self.assertIn("dlq_size", workers)
+        self.assertIn("broker_reachable", workers)
+        # CI runs without REDIS_URL or RABBITMQ_PASSWORD so the snapshot is
+        # the all-zeros degraded-mode shape. Asserting on it pins the contract.
         self.assertEqual(workers["completed_24h"], 0)
         self.assertEqual(workers["failed_24h"], 0)
         self.assertFalse(workers["redis_enabled"])
+        self.assertEqual(workers["queue_depth"], 0)
+        self.assertEqual(workers["in_flight"], 0)
+        self.assertEqual(workers["dlq_size"], 0)
+        self.assertFalse(workers["broker_reachable"])
 
     def test_metrics_disabled_via_env(self):
         # Build a fresh app with METRICS_ENABLED=false so the middleware skips work.

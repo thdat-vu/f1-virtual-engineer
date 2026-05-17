@@ -36,6 +36,7 @@ from core.persistence import (
 )
 from core.timing import TimingMiddleware, snapshot_metrics
 from core import redis_cache
+from core.rabbitmq_metrics import snapshot_worker_metrics
 from tools.fastf1_helper import (
     get_event_drivers,
     get_session_lap_list,
@@ -166,46 +167,63 @@ async def get_metrics():
     return {
         "routes": snapshot_metrics(),
         "cache": {"redis_enabled": redis_cache.is_enabled()},
-        "workers": _snapshot_workers(),
+        "workers": await _snapshot_workers(),
     }
 
 
-def _snapshot_workers() -> dict[str, int | bool]:
-    """Read the rolling 24h Celery counters from Redis (#139 PR3).
+async def _snapshot_workers() -> dict[str, int | bool]:
+    """Combine 24h Celery counters with live broker queue stats (#139).
 
-    Counters are bumped by the worker on terminal failure
-    (`workers:failed_24h`) and on task success
-    (`workers:completed_24h`). Both have a 24h TTL set on first
-    increment so the snapshot reflects a moving window without us
-    having to schedule a sweeper.
+    Two sources of truth, fail-closed at each layer:
 
-    Degrades silently to zeros when Redis is disabled or unreachable —
-    `/metrics` itself must never 5xx because the counters are missing.
+    1. **Redis counters** (``workers:completed_24h`` / ``workers:failed_24h``) —
+       bumped by the worker on terminal failure / task success. 24h TTL
+       set on first increment so the snapshot reflects a moving window
+       without us having to schedule a sweeper.
+
+    2. **RabbitMQ Management API** — live queue depth, in-flight, and
+       DLQ size. The broker is the authoritative source even when the
+       worker pool is down (which is exactly when queue_depth is most
+       interesting to see).
+
+    Either source unreachable degrades to zeros for that block plus a
+    boolean flag (``redis_enabled`` / ``broker_reachable``). ``/metrics``
+    itself must never 5xx because of an observability dependency.
     """
     snapshot: dict[str, int | bool] = {
         "completed_24h": 0,
         "failed_24h": 0,
         "redis_enabled": redis_cache.is_enabled(),
+        "queue_depth": 0,
+        "in_flight": 0,
+        "dlq_size": 0,
+        "broker_reachable": False,
     }
-    if not snapshot["redis_enabled"]:
-        return snapshot
+    if snapshot["redis_enabled"]:
+        try:
+            client = redis_cache._get_client()
+            if client is not None:
+                for key, label in (
+                    ("workers:completed_24h", "completed_24h"),
+                    ("workers:failed_24h", "failed_24h"),
+                ):
+                    raw = client.get(key)
+                    if raw is None:
+                        continue
+                    try:
+                        snapshot[label] = int(raw)
+                    except (TypeError, ValueError):
+                        continue
+        except Exception:  # noqa: BLE001 — fail-closed
+            _logger.warning("Failed to read worker counters from Redis", exc_info=True)
+
     try:
-        client = redis_cache._get_client()
-        if client is None:
-            return snapshot
-        for key, label in (
-            ("workers:completed_24h", "completed_24h"),
-            ("workers:failed_24h", "failed_24h"),
-        ):
-            raw = client.get(key)
-            if raw is None:
-                continue
-            try:
-                snapshot[label] = int(raw)
-            except (TypeError, ValueError):
-                continue
+        broker_stats = await snapshot_worker_metrics()
     except Exception:  # noqa: BLE001 — fail-closed
-        _logger.warning("Failed to read worker counters from Redis", exc_info=True)
+        _logger.warning("Failed to read worker queue stats from RabbitMQ", exc_info=True)
+    else:
+        snapshot.update(broker_stats)
+
     return snapshot
 
 

@@ -425,6 +425,10 @@ export interface MetricsResponse {
     completed_24h: number;
     failed_24h: number;
     redis_enabled: boolean;
+    queue_depth: number;
+    in_flight: number;
+    dlq_size: number;
+    broker_reachable: boolean;
   };
 }
 
