@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
   ClipboardCopy,
   Database,
   Lock,
@@ -13,6 +14,7 @@ import {
   Server,
   Shield,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import { getMetrics, type MetricsResponse, type MetricsRouteSummary } from "@/services/api";
@@ -165,6 +167,8 @@ export default function AdminPage() {
           </div>
         )}
 
+        {data?.workers && <WorkersBlock workers={data.workers} />}
+
         <div className="rounded-sm border border-border bg-surface-elevated overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -234,6 +238,78 @@ function Th({ children, align = "left" }: { children: React.ReactNode; align?: "
 
 function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-4 py-3 text-right font-mono text-[length:var(--text-small)] text-foreground">{children}</td>;
+}
+
+function WorkersBlock({
+  workers,
+}: {
+  workers: NonNullable<MetricsResponse["workers"]>;
+}) {
+  const failed = workers.failed_24h;
+  const completed = workers.completed_24h;
+  const failedStatus: "ok" | "warn" = failed > 0 ? "warn" : "ok";
+  const redisStatus: "ok" | "warn" = workers.redis_enabled ? "ok" : "warn";
+
+  return (
+    <div className="mb-6">
+      <p className="label mb-3 flex items-center gap-2">
+        <Activity size={12} /> Workers · last 24h
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <WorkerCard
+          icon={<CheckCircle2 size={14} />}
+          label="Completed"
+          value={completed.toLocaleString()}
+          status="ok"
+        />
+        <WorkerCard
+          icon={<XCircle size={14} />}
+          label="Failed"
+          value={failed.toLocaleString()}
+          status={failedStatus}
+        />
+        <WorkerCard
+          icon={<Database size={14} />}
+          label="Redis backend"
+          value={workers.redis_enabled ? "enabled" : "disabled"}
+          status={redisStatus}
+        />
+      </div>
+      {!workers.redis_enabled && (
+        <p className="readout mt-2 text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+          Counters reset on backend restart — set <code className="font-mono">REDIS_URL</code> for 24h persistence.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WorkerCard({
+  icon,
+  label,
+  value,
+  status,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  status: "ok" | "warn";
+}) {
+  const color = `var(--status-${status})`;
+  const bg = `var(--status-${status}-dim)`;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-sm border bg-surface-elevated p-4"
+      style={{ borderColor: color, background: bg }}
+    >
+      <p className="label mb-2 flex items-center gap-2" style={{ color }}>
+        {icon} {label}
+      </p>
+      <p className="display text-[length:var(--text-h2)] text-foreground">{value}</p>
+    </motion.div>
+  );
 }
 
 function LivePill() {

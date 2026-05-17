@@ -200,7 +200,7 @@ async def list_analyze_history(*, user_id: str, limit: int = 20) -> list[dict[st
             "limit": str(limit),
             "select": (
                 "id,query,driver,event,year,session_type,intent_type,"
-                "rationale_source,created_at"
+                "rationale_source,rationale_text,created_at"
             ),
         },
     )

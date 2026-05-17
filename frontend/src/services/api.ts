@@ -52,6 +52,11 @@ export interface AnalyzeResponse {
   };
   strategy_data?: StrategyData | null;
   rationale_source?: "llm" | "template";
+  rationale_job_id?: string | null;
+  // ID of the persisted analyze_history row when the caller is signed
+  // in. Frontends use this to track which row to poll for the async
+  // rationale upgrade (#139 PR3).
+  analyze_history_id?: string | null;
   execution?: AnalyzeExecution | null;
   citations?: KnowledgeCitation[];
   error?: string | null;
@@ -264,6 +269,10 @@ export interface AnalyzeHistoryItem {
   session_type: string | null;
   intent_type: string | null;
   rationale_source: string;
+  // Populated by the async-rationale worker (#139 PR3) when the row
+  // has been upgraded from `template` to `llm`. Always absent on rows
+  // produced by the synchronous LLM path.
+  rationale_text?: string | null;
   created_at: string;
 }
 
@@ -412,6 +421,11 @@ export interface MetricsRouteSummary {
 export interface MetricsResponse {
   routes: Record<string, MetricsRouteSummary>;
   cache: { redis_enabled: boolean };
+  workers?: {
+    completed_24h: number;
+    failed_24h: number;
+    redis_enabled: boolean;
+  };
 }
 
 export async function getMetrics(): Promise<MetricsResponse> {

@@ -289,6 +289,7 @@ async def analyze_race_data(
     )
 
     rationale_job_id: str | None = None
+    analyze_history_id: str | None = None
     if user_id and not result.get("error"):
         intent = result.get("intent") or {}
         if rationale_async:
@@ -307,6 +308,7 @@ async def analyze_race_data(
                 rationale_source="template",
                 intent_type=intent.get("intent_type"),
             )
+            analyze_history_id = row_id
             if row_id:
                 try:
                     # Local import: keeps tasks/* off the import path of any
@@ -362,6 +364,7 @@ async def analyze_race_data(
         "strategy_data": result.get("strategy_data"),
         "rationale_source": result.get("rationale_source", "template"),
         "rationale_job_id": rationale_job_id,
+        "analyze_history_id": analyze_history_id,
         "error": result["error"],
         "memory": result.get("memory"),
         "execution": result.get("execution"),

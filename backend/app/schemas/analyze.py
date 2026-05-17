@@ -93,6 +93,13 @@ class AnalyzeResponse(BaseModel):
             "Frontends can poll `/analyze/history` and watch for the row's `rationale_source` to flip from `template` to `llm`."
         ),
     )
+    analyze_history_id: str | None = Field(
+        default=None,
+        description=(
+            "ID of the persisted `analyze_history` row, populated when the caller is signed in and persistence succeeded. "
+            "Frontends use this to track the matching row in `/analyze/history` while waiting for the async rationale upgrade."
+        ),
+    )
     error: str | None = None
     memory: AnalyzeMemory | None = None
     execution: AnalyzeExecution | None = None
