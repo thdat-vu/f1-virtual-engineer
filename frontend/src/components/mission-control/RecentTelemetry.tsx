@@ -48,7 +48,7 @@ function RecentTelemetryPanel({
       if (cancelled) return;
       setStatus("loading");
       try {
-        const res = await getTelemetryHistory(session.access_token, 20);
+        const res = await getTelemetryHistory(session.access_token, 5);
         if (cancelled) return;
         setItems(res.items);
         setStatus("loaded");

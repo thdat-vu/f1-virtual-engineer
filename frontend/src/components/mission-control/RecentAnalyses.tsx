@@ -54,7 +54,7 @@ function RecentAnalysesPanel({
       if (cancelled) return;
       setStatus("loading");
       try {
-        const res = await getAnalyzeHistory(session.access_token, 20);
+        const res = await getAnalyzeHistory(session.access_token, 5);
         if (cancelled) return;
         setItems(res.items);
         setStatus("loaded");
