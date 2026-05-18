@@ -194,9 +194,10 @@ function deriveMeta(item: SavedQueryItem): string {
   if (item.kind === "analyze") {
     const info = (p.session_info as Record<string, unknown> | undefined) ?? {};
     const driver = typeof p.driver === "string" ? p.driver : null;
+    const compare = typeof p.compare_driver === "string" ? p.compare_driver : null;
     const event = typeof info.event === "string" ? info.event : null;
     const year = typeof info.year === "number" ? info.year : null;
-    if (driver) parts.push(driver);
+    if (driver) parts.push(compare ? `${driver} vs ${compare}` : driver);
     if (event) parts.push(event);
     if (year != null) parts.push(String(year));
   } else {

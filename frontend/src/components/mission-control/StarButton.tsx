@@ -19,7 +19,32 @@ type Props = {
 };
 
 function payloadsEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
+/**
+ * Strip null/undefined/empty-string values and recurse into objects so
+ * payloads that differ only in "absent vs explicit empty" still match.
+ *
+ * Why: existing rows were written before the compare_driver field
+ * existed, so their payloads have no `compare_driver` key. New writes
+ * always include `compare_driver: null` (or a real string). Without
+ * normalization, the StarButton's "is this current selection saved?"
+ * check would never match those legacy rows again.
+ */
+function normalize(value: unknown): unknown {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (Array.isArray(value)) return value.map(normalize);
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const n = normalize(v);
+      if (n !== undefined) out[k] = n;
+    }
+    // Sort keys so {a,b} and {b,a} stringify identically.
+    return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
+  }
+  return value;
 }
 
 export function StarButton({ kind, payload, canSave, savedQueries, onChange }: Props) {

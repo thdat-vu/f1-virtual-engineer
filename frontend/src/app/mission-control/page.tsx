@@ -197,6 +197,10 @@ export default function MissionControlPage() {
       if (typeof info.event === "string") setEvent(info.event);
       if (typeof info.session_type === "string") setSession(info.session_type as SessionId);
       if (typeof p.driver === "string") setDriver(p.driver);
+      // compare_driver was added in #153; older rows may lack it, treat
+      // an explicit null or absence the same as "no comparison".
+      if (typeof p.compare_driver === "string") setCompareDriver(p.compare_driver);
+      else setCompareDriver("");
     } else if (item.kind === "telemetry") {
       if (typeof p.year === "number") setYear(p.year);
       if (typeof p.event === "string") setEvent(p.event);

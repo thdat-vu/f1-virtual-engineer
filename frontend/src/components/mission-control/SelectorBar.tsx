@@ -189,8 +189,11 @@ export function SelectorBar({
         <StarButton
           kind="analyze"
           payload={{
-            query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
+            query: compareDriver
+              ? `Analyse ${driver} vs ${compareDriver} at ${eventName} ${year} ${session}`
+              : `Analyse ${driver} ${session} session at ${eventName} ${year}`,
             driver,
+            compare_driver: compareDriver || null,
             session_info: { event: eventName, year, session_type: session },
           }}
           canSave={canRun}
