@@ -149,16 +149,24 @@ export default function MissionControlPage() {
 
   const canRun = !isLoading && !!eventName && !!driver;
 
-  const handleAnalyze = useCallback(async () => {
-    if (!canRun) return;
+  // Single source of truth for the analyze call. Takes explicit args so
+  // history-click handlers can replay against fresh values without
+  // waiting for setState to flush. handleAnalyze and handleSelect*
+  // both funnel through here.
+  const runAnalyze = useCallback(async (args: {
+    year: number;
+    eventName: string;
+    session: SessionId;
+    driver: string;
+  }) => {
     setIsLoading(true);
     setRateLimitMessage(null);
     try {
       const res = await analyzeTelemetry(
         {
-          query: `Analyse ${driver} ${session} session at ${eventName} ${year}`,
-          driver,
-          session_info: { event: eventName, year, session_type: session },
+          query: `Analyse ${args.driver} ${args.session} session at ${args.eventName} ${args.year}`,
+          driver: args.driver,
+          session_info: { event: args.eventName, year: args.year, session_type: args.session },
         },
         authSession?.access_token,
       );
@@ -172,14 +180,26 @@ export default function MissionControlPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [canRun, driver, session, eventName, year, setIsLoading, setResult, authSession]);
+  }, [setIsLoading, setResult, authSession]);
+
+  const handleAnalyze = useCallback(async () => {
+    if (!canRun) return;
+    await runAnalyze({ year, eventName, session, driver });
+  }, [canRun, year, eventName, session, driver, runAnalyze]);
 
   const handleSelectHistory = useCallback((item: AnalyzeHistoryItem) => {
+    const nextYear = item.year ?? year;
+    const nextEvent = item.event ?? eventName;
+    const nextSession = (item.session_type as SessionId | null) ?? session;
+    const nextDriver = item.driver ?? driver;
     if (item.year) setYear(item.year);
     if (item.event) setEvent(item.event);
     if (item.session_type) setSession(item.session_type as SessionId);
     if (item.driver) setDriver(item.driver);
-  }, []);
+    if (nextEvent && nextDriver) {
+      void runAnalyze({ year: nextYear, eventName: nextEvent, session: nextSession, driver: nextDriver });
+    }
+  }, [year, eventName, session, driver, runAnalyze]);
 
   const handleSelectTelemetryHistory = useCallback((item: TelemetryHistoryItem) => {
     setYear(item.year);
@@ -187,12 +207,24 @@ export default function MissionControlPage() {
     setSession(item.session_type as SessionId);
     setDriver(item.driver);
     setLap(item.lap_number != null ? String(item.lap_number) : "");
-  }, []);
+    if (item.event && item.driver) {
+      void runAnalyze({
+        year: item.year,
+        eventName: item.event,
+        session: item.session_type as SessionId,
+        driver: item.driver,
+      });
+    }
+  }, [runAnalyze]);
 
   const handleSelectSaved = useCallback((item: SavedQueryItem) => {
     const p = item.payload as Record<string, unknown>;
     if (item.kind === "analyze") {
       const info = (p.session_info as Record<string, unknown> | undefined) ?? {};
+      const nextYear = typeof info.year === "number" ? info.year : year;
+      const nextEvent = typeof info.event === "string" ? info.event : eventName;
+      const nextSession = (typeof info.session_type === "string" ? info.session_type : session) as SessionId;
+      const nextDriver = typeof p.driver === "string" ? p.driver : driver;
       if (typeof info.year === "number") setYear(info.year);
       if (typeof info.event === "string") setEvent(info.event);
       if (typeof info.session_type === "string") setSession(info.session_type as SessionId);
@@ -201,15 +233,25 @@ export default function MissionControlPage() {
       // an explicit null or absence the same as "no comparison".
       if (typeof p.compare_driver === "string") setCompareDriver(p.compare_driver);
       else setCompareDriver("");
+      if (nextEvent && nextDriver) {
+        void runAnalyze({ year: nextYear, eventName: nextEvent, session: nextSession, driver: nextDriver });
+      }
     } else if (item.kind === "telemetry") {
+      const nextYear = typeof p.year === "number" ? p.year : year;
+      const nextEvent = typeof p.event === "string" ? p.event : eventName;
+      const nextSession = (typeof p.session_type === "string" ? p.session_type : session) as SessionId;
+      const nextDriver = typeof p.driver === "string" ? p.driver : driver;
       if (typeof p.year === "number") setYear(p.year);
       if (typeof p.event === "string") setEvent(p.event);
       if (typeof p.session_type === "string") setSession(p.session_type as SessionId);
       if (typeof p.driver === "string") setDriver(p.driver);
       if (typeof p.lap_number === "number") setLap(String(p.lap_number));
       else setLap("");
+      if (nextEvent && nextDriver) {
+        void runAnalyze({ year: nextYear, eventName: nextEvent, session: nextSession, driver: nextDriver });
+      }
     }
-  }, []);
+  }, [year, eventName, session, driver, runAnalyze]);
 
   const tel     = result?.telemetry_data;
   const strat   = result?.strategy_data;
