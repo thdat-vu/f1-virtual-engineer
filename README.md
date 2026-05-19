@@ -66,9 +66,9 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | `predict_tyre_wear` — standalone tyre-degradation forecast | 🟡 Partial (covered inside `strategy_analyzer`) | — |
 | `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
 | Google sign-in (Supabase Auth foundation) | ✅ Shipped | `/auth/callback` (frontend) |
-| Per-user `/analyze` history — opt-in persistence by session, list endpoint, Mission Control "Recent" panel | ✅ Shipped | `POST /analyze` (writes when JWT present), `GET /analyze/history` |
-| Per-user `/telemetry` history — opt-in persistence by session, list endpoint, Mission Control "Recently viewed" panel | ✅ Shipped | `POST /telemetry` (writes when JWT present), `GET /telemetry/history` |
-| Per-user radio history + saved/favorited queries | ⏳ Planned | tracked in `#95` (radio) + follow-up issue for saved queries |
+| Per-user `/analyze` history — opt-in persistence by session, list endpoint, Mission Control "Recent" panel. Clicking a row replays the analysis so the chart panels populate immediately (cache-warm hit ≈50ms). | ✅ Shipped | `POST /analyze` (writes when JWT present), `GET /analyze/history` |
+| Per-user `/telemetry` history — opt-in persistence by session, list endpoint, Mission Control "Recently viewed" panel. Clicking a row auto-replays the analyze for that session. | ✅ Shipped | `POST /telemetry` (writes when JWT present), `GET /telemetry/history` |
+| Per-user radio history + saved/favorited queries — Star button next to Analyze persists the current selection (driver, session, optional `vs <driver>` comparison) and the Saved panel restores the full state on click. | ✅ Shipped | `POST /radio/analyze` writes radio rows; `GET/POST/DELETE /saved-queries` for saved queries |
 
 ### Reliability features already in production
 
@@ -224,7 +224,7 @@ To enable real sign-in:
    - your staging / production callback once that domain exists.
 4. Restart `npm run dev`. The Mission Control header now shows "Sign in with Google"; signed-in users see their email + a "Sign out" button. The session is cookie-based and survives a refresh.
 
-Signed-in users now also get `/analyze` history persisted server-side (Supabase Postgres + RLS) and surfaced in the Mission Control "Recent" panel. Per-user telemetry + radio history are still tracked under `#94`–`#95`.
+Signed-in users get `/analyze`, `/telemetry`, and radio history persisted server-side (Supabase Postgres + RLS), plus a Star button to save curated queries (driver, session, optional `vs <driver>` comparison). All four panels — Recent, Recently viewed, Radio log, Saved — live in the Mission Control right rail and replay the full analysis on click via the existing L1 + L2 cache.
 
 ### CI/CD recommendation for first user feedback
 
