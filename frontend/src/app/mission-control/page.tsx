@@ -49,6 +49,11 @@ export default function MissionControlPage() {
   // Cleared on the next successful Analyze; surfaced in StrategyHUD when set.
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
 
+  // Retry status for /analyze (#162). 'idle' once a request settles; 'retrying'
+  // while the network-blip retry is mid-flight; 'failed' if even the retry
+  // didn't surface a response — drives the "Try again" CTA in the HUD.
+  const [retryState, setRetryState] = useState<"idle" | "retrying" | "failed">("idle");
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
@@ -161,6 +166,7 @@ export default function MissionControlPage() {
   }) => {
     setIsLoading(true);
     setRateLimitMessage(null);
+    setRetryState("idle");
     try {
       const res = await analyzeTelemetry(
         {
@@ -169,14 +175,20 @@ export default function MissionControlPage() {
           session_info: { event: args.eventName, year: args.year, session_type: args.session },
         },
         authSession?.access_token,
+        { onRetry: () => setRetryState("retrying") },
       );
       setResult(res as AnalyzeResponse);
+      setRetryState("idle");
       if (authSession) setHistoryRefreshSignal((n) => n + 1);
     } catch (err) {
       if (err instanceof RateLimitError) {
         setRateLimitMessage(`Rate limited — retry in ${err.retryAfterSeconds}s`);
+        setRetryState("idle");
+      } else {
+        // Either the retry surfaced a response we couldn't parse, or both
+        // attempts hit a network error. Either way the user gets a CTA.
+        setRetryState("failed");
       }
-      /* other errors silent — HUD shows fallback state */
     } finally {
       setIsLoading(false);
     }
@@ -305,6 +317,7 @@ export default function MissionControlPage() {
       <StrategyHUD
         result={result} strat={strat} isLoading={isLoading} hasData={hasData}
         session={session} theme={theme} rateLimitMessage={rateLimitMessage}
+        retryState={retryState} onRetryClick={handleAnalyze}
         historyRefreshSignal={historyRefreshSignal}
         onSelectHistory={handleSelectHistory}
         telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}

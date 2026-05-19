@@ -328,10 +328,19 @@ export async function getTelemetry(
 // never on a 4xx/5xx — those are deterministic and would just delay the
 // failure.
 const ANALYZE_TIMEOUT_MS = 90_000;
+const ANALYZE_RETRY_DELAY_MS = 400;
+
+export interface AnalyzeOptions {
+  // Fired right before the retry attempt sleeps. Lets the UI surface a
+  // "Retrying 2/2 in 400ms…" pill (#162) without leaking retry mechanics
+  // into the caller's main code path.
+  onRetry?: (attempt: number, delayMs: number) => void;
+}
 
 export async function analyzeTelemetry(
   payload: AnalyzeRequest,
   accessToken?: string,
+  opts: AnalyzeOptions = {},
 ): Promise<AnalyzeResponse> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -364,6 +373,8 @@ export async function analyzeTelemetry(
       err instanceof TypeError ||
       (err as { name?: string } | undefined)?.name === "AbortError";
     if (!isTransient) throw err;
+    opts.onRetry?.(1, ANALYZE_RETRY_DELAY_MS);
+    await delay(ANALYZE_RETRY_DELAY_MS);
     response = await attempt();
   }
 

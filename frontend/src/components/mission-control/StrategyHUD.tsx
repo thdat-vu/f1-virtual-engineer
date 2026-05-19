@@ -14,6 +14,7 @@ import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
   result, strat, isLoading, hasData, session, theme, rateLimitMessage,
+  retryState = "idle", onRetryClick,
   historyRefreshSignal, onSelectHistory,
   telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
   radioHistoryRefreshSignal,
@@ -26,6 +27,8 @@ export function StrategyHUD({
   session: SessionId;
   theme: TeamId;
   rateLimitMessage?: string | null;
+  retryState?: "idle" | "retrying" | "failed";
+  onRetryClick?: () => void;
   historyRefreshSignal?: number;
   onSelectHistory?: (item: AnalyzeHistoryItem) => void;
   telemetryHistoryRefreshSignal?: number;
@@ -131,6 +134,43 @@ export function StrategyHUD({
               >
                 ✓ Rationale upgraded
               </p>
+            )}
+            {retryState === "retrying" && (
+              <p
+                className="readout mt-2 inline-flex items-center gap-1.5 text-[0.6rem] uppercase tracking-[var(--track-wide)]"
+                style={{ color: "var(--status-warn)" }}
+                aria-live="polite"
+              >
+                <motion.span
+                  className="inline-block"
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1.4, ease: "linear" }}
+                >
+                  ↻
+                </motion.span>
+                Network blip — retrying…
+              </p>
+            )}
+            {retryState === "failed" && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p
+                  className="readout text-[0.6rem] uppercase tracking-[var(--track-wide)]"
+                  style={{ color: "var(--status-error)" }}
+                  aria-live="polite"
+                >
+                  Network unstable — try again
+                </p>
+                {onRetryClick && (
+                  <button
+                    type="button"
+                    onClick={onRetryClick}
+                    className="readout border px-2 py-0.5 text-[0.55rem] uppercase tracking-[var(--track-wide)] transition-colors hover:bg-[var(--status-error-dim)]"
+                    style={{ borderColor: "var(--status-error)", color: "var(--status-error)" }}
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
             )}
           </div>
         );
