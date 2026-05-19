@@ -319,18 +319,53 @@ export async function getTelemetry(
   return (await response.json()) as TelemetryEnvelope;
 }
 
+// POST /analyze is idempotent on the server side via the Idempotency-Key
+// header (#161): a fresh UUID per click, the same key on every retry. If
+// the first attempt's TCP connection dies after the server already picked
+// up the work, the retry hits the in-flight entry — server returns 409
+// Retry-After: 2 (still running) or the cached payload (already done).
+// We retry exactly once, only on TypeError (network blip / DNS / abort),
+// never on a 4xx/5xx — those are deterministic and would just delay the
+// failure.
+const ANALYZE_TIMEOUT_MS = 90_000;
+
 export async function analyzeTelemetry(
   payload: AnalyzeRequest,
   accessToken?: string,
 ): Promise<AnalyzeResponse> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  const response = await fetch(`${apiBaseUrl}/analyze`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
+  const body = JSON.stringify(payload);
+
+  const attempt = async (): Promise<Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    try {
+      return await fetch(`${apiBaseUrl}/analyze`, {
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let response: Response;
+  try {
+    response = await attempt();
+  } catch (err) {
+    const isTransient =
+      err instanceof TypeError ||
+      (err as { name?: string } | undefined)?.name === "AbortError";
+    if (!isTransient) throw err;
+    response = await attempt();
+  }
 
   if (response.status === 429) throw await readRateLimit(response);
   if (!response.ok) {

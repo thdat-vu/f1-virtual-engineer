@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Header, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -36,6 +36,7 @@ from core.persistence import (
 )
 from core.timing import TimingMiddleware, snapshot_metrics
 from core import redis_cache
+from core import idempotency
 from core.rabbitmq_metrics import snapshot_worker_metrics
 from tools.fastf1_helper import (
     get_event_drivers,
@@ -278,7 +279,10 @@ async def get_event_roster(year: int, event: str):
     summary="Analyze a telemetry or strategy question",
     description=(
         "Accepts a natural-language query plus optional explicit session context and returns either a telemetry summary "
-        "or a baseline strategy recommendation with confidence, assumptions, and rationale."
+        "or a baseline strategy recommendation with confidence, assumptions, and rationale.\n\n"
+        "Pass an optional `Idempotency-Key` header (UUID recommended) to dedupe retries. The server caches the response "
+        "for 60s under that key — duplicate POSTs within the window return the cached payload without re-running the agent "
+        "or writing a second history row. Concurrent requests with the same key get HTTP 409 with a `Retry-After: 2` hint."
     ),
 )
 @limiter.limit("3/10seconds")
@@ -286,80 +290,67 @@ async def analyze_race_data(
     request: Request,
     body: AnalyzeRequest,
     user_id: str | None = Depends(get_optional_user_id),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
-    # Async-rationale path is opt-in (#139 PR3). It only triggers when:
-    #   1. The env flag is on, AND
-    #   2. The caller is authenticated (we need a persisted row to back-fill)
-    # Anonymous callers always get the synchronous LLM path so they don't
-    # see a degraded "template-only" response with no upgrade route.
-    rationale_async = (
-        os.environ.get("RATIONALE_ASYNC", "").strip().lower() in {"1", "true", "yes", "on"}
-        and user_id is not None
-    )
-
-    session_override = body.session_info.model_dump() if body.session_info else None
-    result = await asyncio.to_thread(
-        analyze_query,
-        body.query,
-        session_override=session_override,
-        driver_override=body.driver,
-        force_template=rationale_async,
-    )
-
-    rationale_job_id: str | None = None
-    analyze_history_id: str | None = None
-    if user_id and not result.get("error"):
-        intent = result.get("intent") or {}
-        if rationale_async:
-            # Synchronous insert: we need the row id to hand to the worker.
-            # The fail-closed helper still won't raise — it returns None on
-            # outage and we just skip the enqueue.
-            row_id = await insert_analyze_history(
-                user_id=user_id,
-                query=body.query,
-                driver=intent.get("driver") or body.driver,
-                event=intent.get("event") or (body.session_info.event if body.session_info else None),
-                year=intent.get("year") or (body.session_info.year if body.session_info else None),
-                session_type=intent.get("session_type")
-                    or (body.session_info.session_type if body.session_info else None),
-                agent_response=result["response_text"],
-                rationale_source="template",
-                intent_type=intent.get("intent_type"),
+    # Idempotency dedupe (#161 / #159 Layer 2). When the client sends an
+    # Idempotency-Key, short-circuit duplicate POSTs so:
+    #   1. Network retries don't double-write analyze_history rows.
+    #   2. Network retries don't burn duplicate Gemini quota.
+    #   3. Two browser tabs hammering Analyze at the same instant don't
+    #      both run the agent — the second one sees the pending entry.
+    # Fail-open: a Redis blip skips dedupe and the request runs as if
+    # the header weren't there. /analyze must never 5xx because the
+    # idempotency layer is unhealthy.
+    if idempotency_key:
+        cached = idempotency.lookup(idempotency_key)
+        if cached is not None:
+            status, payload = cached
+            if status == idempotency.STATUS_DONE and payload is not None:
+                return payload
+            if status == idempotency.STATUS_PENDING:
+                return JSONResponse(
+                    status_code=409,
+                    headers={"Retry-After": "2"},
+                    content={"error": "Duplicate request in flight; retry shortly."},
+                )
+        # First writer wins: if reserve() returns False another caller
+        # already claimed this key in the gap between lookup() and now.
+        if not idempotency.reserve(idempotency_key):
+            return JSONResponse(
+                status_code=409,
+                headers={"Retry-After": "2"},
+                content={"error": "Duplicate request in flight; retry shortly."},
             )
-            analyze_history_id = row_id
-            if row_id:
-                try:
-                    # Local import: keeps tasks/* off the import path of any
-                    # caller that doesn't run the async path (and makes it
-                    # cheap to monkeypatch in tests).
-                    from tasks.rationale import backfill_rationale
 
-                    llm_context = {
-                        "intent": intent,
-                        "telemetry_data": result.get("telemetry_data") or {},
-                        "strategy_data": result.get("strategy_data") or {},
-                        "citations": [
-                            {k: v for k, v in c.items() if k != "score"}
-                            for c in (result.get("citations") or [])
-                        ],
-                    }
-                    async_result = backfill_rationale.delay(
-                        row_id=row_id,
-                        user_id=user_id,
-                        llm_context=llm_context,
-                    )
-                    rationale_job_id = async_result.id
-                except Exception:  # noqa: BLE001
-                    # A broker outage must never break /analyze. We still
-                    # have the row persisted with rationale_source='template';
-                    # the upgrade just won't happen this time.
-                    _logger.warning("Failed to enqueue rationale backfill", exc_info=True)
-        else:
-            # Fire-and-forget so a slow/failing PostgREST call never blocks
-            # the /analyze response. The persistence helper is itself
-            # fail-closed.
-            asyncio.create_task(
-                insert_analyze_history(
+    try:
+        # Async-rationale path is opt-in (#139 PR3). It only triggers when:
+        #   1. The env flag is on, AND
+        #   2. The caller is authenticated (we need a persisted row to back-fill)
+        # Anonymous callers always get the synchronous LLM path so they don't
+        # see a degraded "template-only" response with no upgrade route.
+        rationale_async = (
+            os.environ.get("RATIONALE_ASYNC", "").strip().lower() in {"1", "true", "yes", "on"}
+            and user_id is not None
+        )
+
+        session_override = body.session_info.model_dump() if body.session_info else None
+        result = await asyncio.to_thread(
+            analyze_query,
+            body.query,
+            session_override=session_override,
+            driver_override=body.driver,
+            force_template=rationale_async,
+        )
+
+        rationale_job_id: str | None = None
+        analyze_history_id: str | None = None
+        if user_id and not result.get("error"):
+            intent = result.get("intent") or {}
+            if rationale_async:
+                # Synchronous insert: we need the row id to hand to the worker.
+                # The fail-closed helper still won't raise — it returns None on
+                # outage and we just skip the enqueue.
+                row_id = await insert_analyze_history(
                     user_id=user_id,
                     query=body.query,
                     driver=intent.get("driver") or body.driver,
@@ -368,27 +359,82 @@ async def analyze_race_data(
                     session_type=intent.get("session_type")
                         or (body.session_info.session_type if body.session_info else None),
                     agent_response=result["response_text"],
-                    rationale_source=result.get("rationale_source", "template"),
+                    rationale_source="template",
                     intent_type=intent.get("intent_type"),
                 )
-            )
+                analyze_history_id = row_id
+                if row_id:
+                    try:
+                        # Local import: keeps tasks/* off the import path of any
+                        # caller that doesn't run the async path (and makes it
+                        # cheap to monkeypatch in tests).
+                        from tasks.rationale import backfill_rationale
 
-    return {
-        "status": "error" if result.get("error") else "success",
-        "agent_response": result["response_text"],
-        "query": body.query,
-        "intent": result["intent"],
-        "telemetry_data": result["telemetry_data"],
-        "strategy_data": result.get("strategy_data"),
-        "rationale_source": result.get("rationale_source", "template"),
-        "rationale_job_id": rationale_job_id,
-        "analyze_history_id": analyze_history_id,
-        "error": result["error"],
-        "memory": result.get("memory"),
-        "execution": result.get("execution"),
-        "retry": result.get("retry"),
-        "citations": result.get("citations", []),
-    }
+                        llm_context = {
+                            "intent": intent,
+                            "telemetry_data": result.get("telemetry_data") or {},
+                            "strategy_data": result.get("strategy_data") or {},
+                            "citations": [
+                                {k: v for k, v in c.items() if k != "score"}
+                                for c in (result.get("citations") or [])
+                            ],
+                        }
+                        async_result = backfill_rationale.delay(
+                            row_id=row_id,
+                            user_id=user_id,
+                            llm_context=llm_context,
+                        )
+                        rationale_job_id = async_result.id
+                    except Exception:  # noqa: BLE001
+                        # A broker outage must never break /analyze. We still
+                        # have the row persisted with rationale_source='template';
+                        # the upgrade just won't happen this time.
+                        _logger.warning("Failed to enqueue rationale backfill", exc_info=True)
+            else:
+                # Fire-and-forget so a slow/failing PostgREST call never blocks
+                # the /analyze response. The persistence helper is itself
+                # fail-closed.
+                asyncio.create_task(
+                    insert_analyze_history(
+                        user_id=user_id,
+                        query=body.query,
+                        driver=intent.get("driver") or body.driver,
+                        event=intent.get("event") or (body.session_info.event if body.session_info else None),
+                        year=intent.get("year") or (body.session_info.year if body.session_info else None),
+                        session_type=intent.get("session_type")
+                            or (body.session_info.session_type if body.session_info else None),
+                        agent_response=result["response_text"],
+                        rationale_source=result.get("rationale_source", "template"),
+                        intent_type=intent.get("intent_type"),
+                    )
+                )
+
+        response_payload = {
+            "status": "error" if result.get("error") else "success",
+            "agent_response": result["response_text"],
+            "query": body.query,
+            "intent": result["intent"],
+            "telemetry_data": result["telemetry_data"],
+            "strategy_data": result.get("strategy_data"),
+            "rationale_source": result.get("rationale_source", "template"),
+            "rationale_job_id": rationale_job_id,
+            "analyze_history_id": analyze_history_id,
+            "error": result["error"],
+            "memory": result.get("memory"),
+            "execution": result.get("execution"),
+            "retry": result.get("retry"),
+            "citations": result.get("citations", []),
+        }
+    except Exception:
+        # If the agent run blew up, drop the pending key so a client
+        # retry actually re-runs instead of getting 409 for 60s.
+        if idempotency_key:
+            idempotency.release(idempotency_key)
+        raise
+
+    if idempotency_key:
+        idempotency.commit(idempotency_key, response_payload)
+    return response_payload
 
 
 @app.get(
