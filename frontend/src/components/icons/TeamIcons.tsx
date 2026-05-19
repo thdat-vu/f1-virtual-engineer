@@ -54,7 +54,10 @@ export function TeamIcon({
       width={size}
       height={size}
       className={className}
-      style={{ objectFit: "contain" }}
+      // Lock both dimensions in the inline style so a parent flex/grid
+      // can't stretch one axis and break the aspect-ratio guard that
+      // next/image runs at dev time.
+      style={{ width: size, height: size, objectFit: "contain" }}
       unoptimized
     />
   );
