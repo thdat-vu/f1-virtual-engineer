@@ -189,8 +189,84 @@ async function readRateLimit(response: Response): Promise<RateLimitError> {
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api";
 
+// ─── fetchWithRetry (#160) ────────────────────────────────────────────────
+// Idempotent reads occasionally fail on a wifi blip or a brief 5xx storm;
+// without retry the user sees the panel stay empty until they manually
+// reload. We retry network errors + 502/503/504 only — 4xx (including 429)
+// surfaces to the caller so it can show the right UI, and 500/501/505+
+// are likely deterministic so retrying them just delays the failure.
+//
+// AbortController gives each attempt its own timeout. When the timeout
+// fires it produces an AbortError; we treat that as transient and retry,
+// because no caller currently passes its own signal. Revisit if/when a
+// caller wants user-cancellable requests — at that point we'll need to
+// distinguish "we aborted you" from "you aborted us".
+
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
+interface FetchWithRetryOptions {
+  /** Total attempts = retries + 1. Default 2 retries (3 attempts). */
+  retries?: number;
+  /** Per-attempt timeout. Defaults to 10s. */
+  timeoutMs?: number;
+  /** Backoff schedule. Defaults to 200ms, 800ms. */
+  retryDelayMs?: (attempt: number) => number;
+}
+
+const DEFAULT_RETRY_DELAY = (attempt: number) => (attempt === 0 ? 200 : 800);
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  opts: FetchWithRetryOptions = {},
+): Promise<Response> {
+  const retries = opts.retries ?? 2;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+  const delayFor = opts.retryDelayMs ?? DEFAULT_RETRY_DELAY;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(input, { ...init, signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
+        return response;
+      }
+      if (attempt < retries) {
+        await delay(delayFor(attempt));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      clearTimeout(timer);
+      lastError = err;
+      const isTransient =
+        err instanceof TypeError ||
+        (err as { name?: string } | undefined)?.name === "AbortError";
+      if (isTransient && attempt < retries) {
+        await delay(delayFor(attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError ?? new Error("fetchWithRetry exhausted without response");
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Per-call timeout budgets. Schedule / driver / lap rosters call FastF1
+// which can be slow on a cold cache; histories and metrics hit fast
+// PostgREST + in-memory snapshots so they should bail quickly.
+const TIMEOUT_LONG_MS = 10_000;
+const TIMEOUT_SHORT_MS = 5_000;
+
 export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
-  const response = await fetch(`${apiBaseUrl}/events/${year}`);
+  const response = await fetchWithRetry(`${apiBaseUrl}/events/${year}`, {}, { timeoutMs: TIMEOUT_LONG_MS });
   if (!response.ok) {
     throw new Error(`Failed to fetch events for ${year}`);
   }
@@ -198,7 +274,11 @@ export async function getEventsByYear(year: number): Promise<ScheduleResponse> {
 }
 
 export async function getEventDrivers(year: number, event: string): Promise<RosterResponse> {
-  const response = await fetch(`${apiBaseUrl}/events/${year}/${encodeURIComponent(event)}/drivers`);
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/events/${year}/${encodeURIComponent(event)}/drivers`,
+    {},
+    { timeoutMs: TIMEOUT_LONG_MS },
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch drivers for ${event} ${year}`);
   }
@@ -212,7 +292,7 @@ export async function getEventLaps(
   driver: string,
 ): Promise<LapListResponse> {
   const url = `${apiBaseUrl}/laps/${year}/${encodeURIComponent(event)}/${encodeURIComponent(session_type)}/${encodeURIComponent(driver)}`;
-  const response = await fetch(url);
+  const response = await fetchWithRetry(url, {}, { timeoutMs: TIMEOUT_LONG_MS });
   if (response.status === 429) throw await readRateLimit(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch laps for ${driver} at ${event} ${year}`);
@@ -284,9 +364,11 @@ export async function getAnalyzeHistory(
   accessToken: string,
   limit = 20,
 ): Promise<AnalyzeHistoryResponse> {
-  const response = await fetch(`${apiBaseUrl}/analyze/history?limit=${limit}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/analyze/history?limit=${limit}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { timeoutMs: TIMEOUT_SHORT_MS },
+  );
   if (!response.ok) {
     throw new Error(`Analyze history request failed with status ${response.status}`);
   }
@@ -311,9 +393,11 @@ export async function getTelemetryHistory(
   accessToken: string,
   limit = 20,
 ): Promise<TelemetryHistoryResponse> {
-  const response = await fetch(`${apiBaseUrl}/telemetry/history?limit=${limit}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/telemetry/history?limit=${limit}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { timeoutMs: TIMEOUT_SHORT_MS },
+  );
   if (!response.ok) {
     throw new Error(`Telemetry history request failed with status ${response.status}`);
   }
@@ -342,9 +426,11 @@ export async function getRadioHistory(
 ): Promise<RadioHistoryResponse> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (driver) params.set("driver", driver);
-  const response = await fetch(`${apiBaseUrl}/radio/history?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/radio/history?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { timeoutMs: TIMEOUT_SHORT_MS },
+  );
   if (!response.ok) {
     throw new Error(`Radio history request failed with status ${response.status}`);
   }
@@ -369,9 +455,11 @@ export async function getSavedQueries(
   accessToken: string,
   limit = 50,
 ): Promise<SavedQueryListResponse> {
-  const response = await fetch(`${apiBaseUrl}/saved-queries?limit=${limit}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/saved-queries?limit=${limit}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { timeoutMs: TIMEOUT_SHORT_MS },
+  );
   if (!response.ok) {
     throw new Error(`Saved queries request failed with status ${response.status}`);
   }
@@ -433,7 +521,11 @@ export interface MetricsResponse {
 }
 
 export async function getMetrics(): Promise<MetricsResponse> {
-  const response = await fetch(`${apiBaseUrl}/metrics`, { cache: "no-store" });
+  const response = await fetchWithRetry(
+    `${apiBaseUrl}/metrics`,
+    { cache: "no-store" },
+    { timeoutMs: TIMEOUT_SHORT_MS },
+  );
   if (!response.ok) {
     throw new Error(`Metrics request failed with status ${response.status}`);
   }
