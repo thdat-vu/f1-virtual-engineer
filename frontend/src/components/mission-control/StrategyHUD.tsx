@@ -239,6 +239,22 @@ export function StrategyHUD({
                 )}
               </p>
             )}
+            {strat.pit_loss_seconds != null && (
+              <p
+                className="readout mt-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-foreground-faint"
+                title="Approximate seconds lost on a pit stop at this circuit."
+              >
+                Pit loss · {strat.pit_loss_seconds.toFixed(1)}s
+                {strat.undercut_break_even_laps != null && (
+                  <>
+                    {" · undercut viable in "}
+                    <span className="font-bold text-accent">
+                      ~{strat.undercut_break_even_laps}L
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
             {strat.fallback && (
               <p className="readout mt-1 text-[0.55rem]" style={{ color: "var(--status-warn)" }}>
                 {strat.fallback_reason ?? "Estimate — live data unavailable"}

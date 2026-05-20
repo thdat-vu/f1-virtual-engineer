@@ -35,6 +35,9 @@ export interface StrategyData {
   competitor_ahead?: string | null;
   competitor_position_relative?: "ahead" | "behind" | null;
   gap_sampled_at_lap?: number | null;
+  // Slice 1C of #168: pit-loss + undercut break-even projection.
+  pit_loss_seconds?: number | null;
+  undercut_break_even_laps?: number | null;
 }
 
 export interface AnalyzeResponse {
