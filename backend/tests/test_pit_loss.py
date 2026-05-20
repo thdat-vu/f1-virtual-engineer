@@ -24,6 +24,16 @@ class LookupPitLossTests(unittest.TestCase):
         self.assertEqual(lookup_pit_loss_seconds("Japan GP"), 22.0)
         self.assertEqual(lookup_pit_loss_seconds("japanese grand prix"), 22.0)
 
+    def test_adjective_form_event_names_match(self):
+        # Regression: FastF1 names the events with the adjective form
+        # ("Canadian Grand Prix", not "Canada GP"), so the table keys
+        # must be the adjective. Canada has the shortest pit lane on the
+        # calendar — falling through to default 22s would silently
+        # mislead the undercut projection by ~5s.
+        self.assertEqual(lookup_pit_loss_seconds("Canadian Grand Prix"), 16.5)
+        self.assertEqual(lookup_pit_loss_seconds("British Grand Prix"), 22.0)
+        self.assertEqual(lookup_pit_loss_seconds("Spanish Grand Prix"), 22.0)
+
     def test_unknown_track_returns_default(self):
         # Future or hypothetical events fall back to the table median —
         # better than blanking the panel.

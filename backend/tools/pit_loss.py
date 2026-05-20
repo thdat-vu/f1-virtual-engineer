@@ -24,6 +24,9 @@ import math
 # Source: rough team estimates from race-weekend coverage; precise to
 # within ~1s. Keys are uppercased substrings matched against the
 # FastF1 event name (e.g. "Japanese Grand Prix" matches "JAPAN").
+# Note: keys must be substrings of the actual FastF1 event names.
+# "CANADIAN" not "CANADA", "SPANISH" not "SPAIN", "BRITISH" not
+# "BRITAIN" — the events are named with the adjective form.
 _PIT_LOSS_BY_KEYWORD: dict[str, float] = {
     "BAHRAIN": 22.0,
     "SAUDI": 21.0,
@@ -33,10 +36,10 @@ _PIT_LOSS_BY_KEYWORD: dict[str, float] = {
     "MIAMI": 21.0,
     "EMILIA": 22.0,
     "MONACO": 17.5,
-    "CANADA": 16.5,
-    "SPAIN": 22.0,
+    "CANADIAN": 16.5,
+    "SPANISH": 22.0,
     "AUSTRIA": 19.5,
-    "BRITAIN": 22.0,
+    "BRITISH": 22.0,
     "HUNGARY": 20.0,
     "BELGIAN": 21.0,
     "DUTCH": 22.0,
