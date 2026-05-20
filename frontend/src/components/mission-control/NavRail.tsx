@@ -14,9 +14,14 @@ export function NavRail() {
 
   return (
     <nav className="z-40 flex w-14 shrink-0 flex-col items-center gap-0 border-r border-border bg-surface py-5">
-      <div className="mb-8 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-accent text-[0.85rem] font-black italic text-background">
-        A
-      </div>
+      <Link
+        href="/"
+        title="Home"
+        aria-label="F1 Virtual Engineer — home"
+        className="mb-8 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-accent text-[0.65rem] font-black italic tracking-tight text-background"
+      >
+        F1
+      </Link>
       <div className="flex flex-col items-center gap-5">
         <Link href="/" title="Landing" className="rounded p-1 text-foreground-dim transition-colors hover:text-foreground">
           <NavIcon d={HOME_ICON_D} />
