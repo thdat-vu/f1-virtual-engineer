@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { AnalyzeHistoryItem, AnalyzeResponse, SavedQueryItem, StrategyData, TelemetryHistoryItem } from "@/services/api";
 import { TeamIcon } from "@/components/icons/TeamIcons";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
@@ -10,6 +10,7 @@ import { RecentTelemetry } from "./RecentTelemetry";
 import { RadioLog } from "./RadioLog";
 import { ReferencesPanel } from "./ReferencesPanel";
 import { SavedQueriesPanel } from "./SavedQueriesPanel";
+import { WhyThisCallPanel } from "./WhyThisCallPanel";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
@@ -177,28 +178,7 @@ export function StrategyHUD({
       })()}
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-4">
-        <p className="label mb-3">Tactical Rationale</p>
-        <AnimatePresence mode="wait">
-          <motion.ul key={hasData ? "data" : "idle"} className="space-y-2">
-            {(hasData && strat?.rationale?.length
-              ? strat.rationale
-              : [
-                  "Awaiting session selection.",
-                  "Tyre degradation model ready.",
-                  "Pace delta tracking idle.",
-                  "Competitor windows standby.",
-                ]
-            ).map((line, i) => (
-              <motion.li key={i}
-                initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.07, duration: 0.3 }}
-                className="readout flex gap-2 text-[length:var(--text-readout)] text-foreground-dim">
-                <span className="text-accent">—</span>
-                <span>{line}</span>
-              </motion.li>
-            ))}
-          </motion.ul>
-        </AnimatePresence>
+        <WhyThisCallPanel result={result} strat={strat} hasData={hasData} />
 
         {hasData && strat?.recommended_pit_window_laps?.length === 2 && (
           <motion.div
