@@ -214,7 +214,11 @@ export function StrategyHUD({
                       : "Explicit override"
                 }
               >
-                {strat.competitor_ahead ? `vs ${strat.competitor_ahead} · ` : "Gap · "}
+                {strat.competitor_ahead
+                  ? `vs ${strat.competitor_ahead}${
+                      strat.competitor_position_relative === "behind" ? " ↓" : ""
+                    } · `
+                  : "Gap · "}
                 <span className="text-foreground">{strat.current_gap_seconds.toFixed(1)}s</span>
                 {" → undercut "}
                 <span

@@ -2,6 +2,10 @@ export interface AnalyzeRequest {
   query: string;
   driver?: string | null;
   session_info?: Record<string, unknown> | null;
+  // Slice 1B of #168: optional 3-letter competitor code. Backend uses
+  // it to measure the strategy gap against this driver instead of the
+  // car directly ahead.
+  target_driver?: string | null;
 }
 
 export interface TelemetryChannel {
@@ -29,6 +33,7 @@ export interface StrategyData {
   current_gap_seconds?: number | null;
   gap_source?: "fastf1" | "fallback" | "explicit" | null;
   competitor_ahead?: string | null;
+  competitor_position_relative?: "ahead" | "behind" | null;
   gap_sampled_at_lap?: number | null;
 }
 

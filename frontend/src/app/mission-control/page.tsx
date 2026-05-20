@@ -163,6 +163,7 @@ export default function MissionControlPage() {
     eventName: string;
     session: SessionId;
     driver: string;
+    targetDriver?: string;
   }) => {
     setIsLoading(true);
     setRateLimitMessage(null);
@@ -173,6 +174,10 @@ export default function MissionControlPage() {
           query: `Analyse ${args.driver} ${args.session} session at ${args.eventName} ${args.year}`,
           driver: args.driver,
           session_info: { event: args.eventName, year: args.year, session_type: args.session },
+          // Slice 1B of #168: when the user picked a "vs" driver, reuse
+          // it as the strategy target so the gap line in the HUD reflects
+          // their actual rival rather than whoever's running ahead.
+          target_driver: args.targetDriver || null,
         },
         authSession?.access_token,
         { onRetry: () => setRetryState("retrying") },
@@ -196,8 +201,8 @@ export default function MissionControlPage() {
 
   const handleAnalyze = useCallback(async () => {
     if (!canRun) return;
-    await runAnalyze({ year, eventName, session, driver });
-  }, [canRun, year, eventName, session, driver, runAnalyze]);
+    await runAnalyze({ year, eventName, session, driver, targetDriver: compareDriver });
+  }, [canRun, year, eventName, session, driver, compareDriver, runAnalyze]);
 
   const handleSelectHistory = useCallback((item: AnalyzeHistoryItem) => {
     const nextYear = item.year ?? year;
