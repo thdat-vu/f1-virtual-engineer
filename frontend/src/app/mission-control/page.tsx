@@ -318,6 +318,7 @@ export default function MissionControlPage() {
         result={result} strat={strat} isLoading={isLoading} hasData={hasData}
         session={session} theme={theme} rateLimitMessage={rateLimitMessage}
         retryState={retryState} onRetryClick={handleAnalyze}
+        year={year} eventName={eventName} driver={driver}
         historyRefreshSignal={historyRefreshSignal}
         onSelectHistory={handleSelectHistory}
         telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}

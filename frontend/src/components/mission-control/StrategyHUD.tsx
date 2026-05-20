@@ -10,12 +10,14 @@ import { RecentTelemetry } from "./RecentTelemetry";
 import { RadioLog } from "./RadioLog";
 import { ReferencesPanel } from "./ReferencesPanel";
 import { SavedQueriesPanel } from "./SavedQueriesPanel";
+import { TyreCard } from "./TyreCard";
 import { WhyThisCallPanel } from "./WhyThisCallPanel";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
 
 export function StrategyHUD({
   result, strat, isLoading, hasData, session, theme, rateLimitMessage,
   retryState = "idle", onRetryClick,
+  year, eventName, driver,
   historyRefreshSignal, onSelectHistory,
   telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
   radioHistoryRefreshSignal,
@@ -30,6 +32,9 @@ export function StrategyHUD({
   rateLimitMessage?: string | null;
   retryState?: "idle" | "retrying" | "failed";
   onRetryClick?: () => void;
+  year: number;
+  eventName: string;
+  driver: string;
   historyRefreshSignal?: number;
   onSelectHistory?: (item: AnalyzeHistoryItem) => void;
   telemetryHistoryRefreshSignal?: number;
@@ -179,6 +184,8 @@ export function StrategyHUD({
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-4">
         <WhyThisCallPanel result={result} strat={strat} hasData={hasData} />
+
+        <TyreCard year={year} event={eventName} session={session} driver={driver} />
 
         {hasData && strat?.recommended_pit_window_laps?.length === 2 && (
           <motion.div

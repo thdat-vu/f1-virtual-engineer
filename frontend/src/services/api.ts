@@ -577,3 +577,46 @@ export async function getMetrics(): Promise<MetricsResponse> {
   }
   return (await response.json()) as MetricsResponse;
 }
+
+// ─── Tyre Intelligence (#167) ─────────────────────────────────────────
+// Standalone tyre snapshot — answers "how is this stint actually
+// decaying right now" without needing a full strategy recommendation.
+// Same fail-closed contract as /telemetry: status === "error" + a
+// populated fallback envelope when FastF1 hiccups.
+
+export interface TyreAnalyzeRequest {
+  year: number;
+  event: string;
+  session_type: string;
+  driver: string;
+}
+
+export interface TyreAnalyzeResponse {
+  status: "success" | "error";
+  driver: string;
+  year: number;
+  event: string;
+  session_type: string;
+  compound: string | null;
+  stint_laps: number;
+  decay_seconds_per_lap: number;
+  cliff_lap_estimate: number | null;
+  confidence_band: "high" | "medium" | "low";
+  fallback: boolean;
+  fallback_reason?: string | null;
+}
+
+export async function analyzeTyre(
+  payload: TyreAnalyzeRequest,
+): Promise<TyreAnalyzeResponse> {
+  const response = await fetch(`${apiBaseUrl}/tyre/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 429) throw await readRateLimit(response);
+  if (!response.ok) {
+    throw new Error(`Tyre analyze request failed with status ${response.status}`);
+  }
+  return (await response.json()) as TyreAnalyzeResponse;
+}

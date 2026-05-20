@@ -22,6 +22,7 @@ from app.schemas.saved_queries import (
 from app.schemas.knowledge import KnowledgeLookupRequest, KnowledgeLookupResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
+from app.schemas.tyre import TyreAnalyzeRequest, TyreAnalyzeResponse
 from core.auth import get_optional_user_id, get_required_user_id
 from core.persistence import (
     delete_saved_query,
@@ -46,6 +47,7 @@ from tools.fastf1_helper import (
     load_prebaked_into_caches,
 )
 from tools.knowledge_retriever import lookup as knowledge_lookup
+from tools.tyre_helper import compute_tyre_decay
 
 
 _logger = logging.getLogger(__name__)
@@ -622,6 +624,36 @@ async def get_telemetry(
         )
 
     return TelemetryResponse(status="success", data=summary, error=None)
+
+
+@app.post(
+    "/tyre/analyze",
+    response_model=TyreAnalyzeResponse,
+    tags=["telemetry"],
+    summary="Tyre intelligence snapshot for a driver/session",
+    description=(
+        "Returns the current stint compound, observed lap-time decay, and a projected "
+        "cliff-lap estimate. Composes the cached lap roster with the predict_tyre_wear "
+        "heuristic — fail-closed: any FastF1 hiccup degrades to a populated envelope "
+        "with `fallback: true` rather than 5xx."
+    ),
+)
+@limiter.limit("30/10seconds")
+async def analyze_tyre(
+    request: Request,
+    body: TyreAnalyzeRequest,
+):
+    snapshot = await asyncio.to_thread(
+        compute_tyre_decay,
+        year=body.year,
+        event=body.event,
+        session_type=body.session_type,
+        driver=body.driver,
+    )
+    return TyreAnalyzeResponse(
+        status="error" if snapshot.get("fallback") else "success",
+        **snapshot,
+    )
 
 
 @app.get(

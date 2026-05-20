@@ -29,7 +29,8 @@ def _stub_response(status_code: int, payload: dict | None = None) -> MagicMock:
 class FetchQueueStatsTests(unittest.IsolatedAsyncioTestCase):
     @patch.dict(
         "os.environ",
-        {"RABBITMQ_PASSWORD": "x", "RABBITMQ_MANAGEMENT_URL": "http://broker:15672"},
+        {"RABBITMQ_PASSWORD": "x", "RABBITMQ_USER": "apex",
+         "RABBITMQ_MANAGEMENT_URL": "http://broker:15672"},
     )
     async def test_returns_stats_on_200(self):
         client = MagicMock()

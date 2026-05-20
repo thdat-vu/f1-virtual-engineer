@@ -77,8 +77,17 @@ class AnalyzePersistenceTests(unittest.TestCase):
     def setUp(self) -> None:
         reset_rate_limiter()
         self.client = TestClient(app)
+        # Pin RATIONALE_ASYNC off — these tests verify the *synchronous*
+        # persistence path. If a developer's local backend/.env has
+        # RATIONALE_ASYNC=true the handler tries to enqueue Celery and
+        # the redis result backend connect blows up unrelated to the
+        # behaviour under test. The async path has its own coverage in
+        # test_analyze_async_persistence below.
+        self._async_patch = patch.dict("os.environ", {"RATIONALE_ASYNC": ""})
+        self._async_patch.start()
 
     def tearDown(self) -> None:
+        self._async_patch.stop()
         app.dependency_overrides.pop(get_optional_user_id, None)
         app.dependency_overrides.pop(get_required_user_id, None)
 
