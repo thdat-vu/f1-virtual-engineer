@@ -64,6 +64,18 @@ class StrategySummary(BaseModel):
         default=None,
         description="Lap number at which the gap was sampled.",
     )
+    pit_loss_seconds: float | None = Field(
+        default=None,
+        description="Approximate seconds lost on a pit stop at this circuit (slice 1C of #168).",
+    )
+    undercut_break_even_laps: int | None = Field(
+        default=None,
+        description=(
+            "Estimated laps before an undercut overtakes the rival. "
+            "Populated only when chasing a competitor (gap > 0). "
+            "Slice 1C of #168."
+        ),
+    )
 
 
 class AnalyzeIntent(BaseModel):

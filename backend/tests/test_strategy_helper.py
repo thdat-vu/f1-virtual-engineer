@@ -287,5 +287,82 @@ class StrategyHelperTests(unittest.TestCase):
         self.assertNotIn("VER", strategy["assumptions"][0])
 
 
+    @patch("tools.strategy_helper.get_gap_to_competitor")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_strategy_analyzer_surfaces_pit_loss_and_undercut_estimate(
+        self, mock_predict, mock_competitor
+    ):
+        # Slice 1C of #168: pit_loss_seconds + undercut_break_even_laps
+        # are wired onto the strategy payload when chasing a competitor.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Japanese Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.30,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_competitor.return_value = {
+            "gap_seconds": 1.4,
+            "competitor_position_relative": "ahead",
+            "lap_number": 25,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+
+        result = strategy_analyzer(
+            2024, "Japanese Grand Prix", "R", "HAM", target_driver="VER"
+        )
+
+        strategy = result["strategy"]
+        # Japan = 22s pit loss; advantage ~0.8s/lap → 2-lap break-even.
+        self.assertEqual(strategy["pit_loss_seconds"], 22.0)
+        self.assertEqual(strategy["undercut_break_even_laps"], 2)
+
+    @patch("tools.strategy_helper.get_gap_to_competitor")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_undercut_estimate_hidden_when_competitor_is_behind(
+        self, mock_predict, mock_competitor
+    ):
+        # If the rival is BEHIND, undercut math doesn't apply — the panel
+        # should still show pit_loss_seconds (it's a track property) but
+        # leave undercut_break_even_laps unset so the UI hides the line.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.20,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_competitor.return_value = {
+            "gap_seconds": 2.0,
+            "competitor_position_relative": "behind",
+            "lap_number": 25,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+
+        result = strategy_analyzer(
+            2024, "Bahrain Grand Prix", "R", "HAM", target_driver="NOR"
+        )
+
+        strategy = result["strategy"]
+        self.assertEqual(strategy["pit_loss_seconds"], 22.0)
+        self.assertIsNone(strategy["undercut_break_even_laps"])
+
+
 if __name__ == "__main__":
     unittest.main()

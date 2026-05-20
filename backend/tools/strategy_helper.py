@@ -6,6 +6,10 @@ from tools.fastf1_helper import (
     get_current_gap_to_ahead,
     get_gap_to_competitor,
 )
+from tools.pit_loss import (
+    estimate_undercut_break_even_laps,
+    lookup_pit_loss_seconds,
+)
 
 extract_tyre_wear_features = traced("tyre_wear")(_raw_extract_tyre_wear_features)
 
@@ -178,6 +182,21 @@ def strategy_analyzer(
     )
     overcut_risk = "high" if degradation_rate >= 0.45 else ("medium" if degradation_rate >= 0.25 else "low")
 
+    # Slice 1C of #168: pit-loss + undercut break-even projection.
+    # Only meaningful when chasing a competitor that's ahead — undercut
+    # math doesn't apply if we're the leader (no competitor) or already
+    # ahead of the picked target.
+    pit_loss_seconds = lookup_pit_loss_seconds(event)
+    is_chasing = competitor_position_relative == "ahead"
+    undercut_break_even_laps = (
+        estimate_undercut_break_even_laps(
+            gap_seconds=resolved_gap,
+            degradation_per_lap=degradation_rate,
+        )
+        if is_chasing
+        else None
+    )
+
     if competitor:
         rel = (
             f" ({competitor_position_relative})"
@@ -189,6 +208,7 @@ def strategy_analyzer(
         gap_assumption = f"Current gap to rival considered: {resolved_gap:.1f}s."
     assumptions = [
         gap_assumption,
+        f"Pit loss at this circuit assumed {pit_loss_seconds:.1f}s.",
         "Historical pace delta assumed stable over next 5 laps.",
         "Tyre performance follows extracted degradation trend.",
     ]
@@ -197,6 +217,11 @@ def strategy_analyzer(
         f"Expected performance drop window from predictor: laps {drop_window[0]}-{drop_window[1]}.",
         f"Undercut risk classified as {undercut_risk} based on gap and wear trend.",
     ]
+    if undercut_break_even_laps is not None:
+        rationale.append(
+            f"Undercut breaks even after ~{undercut_break_even_laps} laps "
+            f"(gap {resolved_gap:.1f}s vs ~{degradation_rate + 0.5:.2f}s/lap pace swing)."
+        )
 
     return {
         "driver": driver.upper(),
@@ -217,6 +242,8 @@ def strategy_analyzer(
             "competitor_ahead": competitor,
             "competitor_position_relative": competitor_position_relative,
             "gap_sampled_at_lap": gap_lap,
+            "pit_loss_seconds": round(pit_loss_seconds, 1),
+            "undercut_break_even_laps": undercut_break_even_laps,
         },
         "tyre_prediction": prediction,
     }
