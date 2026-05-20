@@ -22,6 +22,14 @@ export interface StrategyData {
   rationale: string[];
   fallback: boolean;
   fallback_reason?: string | null;
+  // Slice 1A of #168: gap context surfaced from FastF1 by strategy_analyzer.
+  // current_gap_seconds is populated whether the value came live, from the
+  // 1.2s legacy fallback, or from an explicit caller override; gap_source
+  // tells the UI which one so we can render confidence honestly.
+  current_gap_seconds?: number | null;
+  gap_source?: "fastf1" | "fallback" | "explicit" | null;
+  competitor_ahead?: string | null;
+  gap_sampled_at_lap?: number | null;
 }
 
 export interface AnalyzeResponse {

@@ -203,6 +203,38 @@ export function StrategyHUD({
             <p className="readout text-base font-bold text-accent">
               LAP {strat.recommended_pit_window_laps[0]} – {strat.recommended_pit_window_laps[1]}
             </p>
+            {strat.current_gap_seconds != null && (
+              <p
+                className="readout mt-1 text-[0.6rem] uppercase tracking-[var(--track-wide)] text-foreground-dim"
+                title={
+                  strat.gap_source === "fastf1"
+                    ? `Sampled lap ${strat.gap_sampled_at_lap ?? "—"} from FastF1`
+                    : strat.gap_source === "fallback"
+                      ? "Live gap unavailable — using 1.2s assumption"
+                      : "Explicit override"
+                }
+              >
+                {strat.competitor_ahead ? `vs ${strat.competitor_ahead} · ` : "Gap · "}
+                <span className="text-foreground">{strat.current_gap_seconds.toFixed(1)}s</span>
+                {" → undercut "}
+                <span
+                  className="font-bold"
+                  style={{
+                    color:
+                      strat.undercut_risk === "high"
+                        ? "var(--status-error)"
+                        : strat.undercut_risk === "medium"
+                          ? "var(--status-warn)"
+                          : "var(--status-ok)",
+                  }}
+                >
+                  {strat.undercut_risk}
+                </span>
+                {strat.gap_source === "fallback" && (
+                  <span style={{ color: "var(--status-warn)" }}> · est.</span>
+                )}
+              </p>
+            )}
             {strat.fallback && (
               <p className="readout mt-1 text-[0.55rem]" style={{ color: "var(--status-warn)" }}>
                 {strat.fallback_reason ?? "Estimate — live data unavailable"}
