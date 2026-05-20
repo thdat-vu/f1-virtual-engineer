@@ -141,9 +141,12 @@ def strategy_analyzer(
             year, event, session_type, driver, target_driver
         )
         if gap_envelope.get("fallback") or gap_envelope.get("gap_seconds") is None:
+            # Don't attribute the synthetic 1.2s to a named driver — that
+            # would read as "Current gap to VER: 1.2s" which is misleading.
+            # Leave competitor unset so the assumption falls back to the
+            # generic "rival considered" wording.
             resolved_gap = _GAP_FALLBACK_SECONDS
             gap_source = "fallback"
-            competitor = target_driver.upper()
         else:
             resolved_gap = float(gap_envelope["gap_seconds"])
             competitor = target_driver.upper()

@@ -248,9 +248,11 @@ class StrategyHelperTests(unittest.TestCase):
 
     @patch("tools.strategy_helper.get_gap_to_competitor")
     @patch("tools.strategy_helper.predict_tyre_wear")
-    def test_target_competitor_fallback_keeps_competitor_label(self, mock_predict, mock_competitor):
-        # If FastF1 errors out we still want the UI to show who the user
-        # picked — just with the legacy 1.2s assumption flagged.
+    def test_target_competitor_fallback_drops_competitor_label(self, mock_predict, mock_competitor):
+        # When FastF1 falls back the gap value is synthetic — we must NOT
+        # attribute the 1.2s to a named driver, because the assumption
+        # string would then read "Current gap to VER: 1.2s" which is a
+        # lie. Reverts to the generic "rival considered" wording.
         mock_predict.return_value = {
             "driver": "HAM",
             "year": 2024,
@@ -279,8 +281,10 @@ class StrategyHelperTests(unittest.TestCase):
 
         strategy = result["strategy"]
         self.assertEqual(strategy["gap_source"], "fallback")
-        self.assertEqual(strategy["competitor_ahead"], "VER")
+        self.assertIsNone(strategy["competitor_ahead"])
         self.assertEqual(strategy["current_gap_seconds"], 1.2)
+        # Assumption must not name the picked driver alongside a synthetic gap.
+        self.assertNotIn("VER", strategy["assumptions"][0])
 
 
 if __name__ == "__main__":
