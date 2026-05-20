@@ -1,9 +1,18 @@
 from typing import Any
 
 from core.trace import traced
-from tools.fastf1_helper import extract_tyre_wear_features as _raw_extract_tyre_wear_features
+from tools.fastf1_helper import (
+    extract_tyre_wear_features as _raw_extract_tyre_wear_features,
+    get_current_gap_to_ahead,
+)
 
 extract_tyre_wear_features = traced("tyre_wear")(_raw_extract_tyre_wear_features)
+
+# Default fallback gap when FastF1 can't tell us where the car ahead is.
+# 1.2s used to be the hardcoded value; keeping it as the fallback so a
+# FastF1 hiccup degrades to "assume tight battle" rather than blanking
+# the undercut/overcut classification entirely.
+_GAP_FALLBACK_SECONDS = 1.2
 
 
 def predict_tyre_wear(
@@ -83,10 +92,14 @@ def strategy_analyzer(
     event: str,
     session_type: str,
     driver: str,
-    current_gap_seconds: float = 1.2,
+    current_gap_seconds: float | None = None,
 ) -> dict[str, Any]:
     """
     Build pit-window recommendation using tyre wear prediction and pace assumptions.
+
+    ``current_gap_seconds`` is computed from FastF1 by default (gap to the
+    car ahead at the driver's last lap). Pass an explicit value to skip
+    the FastF1 lookup — handy in tests and for what-if scenarios.
     """
     tyre_prediction = predict_tyre_wear(year, event, session_type, driver)
 
@@ -108,6 +121,25 @@ def strategy_analyzer(
             },
         }
 
+    # Resolve gap once. Honor explicit caller overrides; otherwise fetch
+    # from FastF1 and degrade to the legacy 1.2s assumption on fallback.
+    competitor: str | None = None
+    gap_lap: int | None = None
+    gap_source: str
+    if current_gap_seconds is not None:
+        resolved_gap = float(current_gap_seconds)
+        gap_source = "explicit"
+    else:
+        gap_envelope = get_current_gap_to_ahead(year, event, session_type, driver)
+        if gap_envelope.get("fallback") or gap_envelope.get("gap_seconds") is None:
+            resolved_gap = _GAP_FALLBACK_SECONDS
+            gap_source = "fallback"
+        else:
+            resolved_gap = float(gap_envelope["gap_seconds"])
+            competitor = gap_envelope.get("driver_ahead")
+            gap_lap = gap_envelope.get("lap_number")
+            gap_source = "fastf1"
+
     prediction = tyre_prediction["prediction"]
     degradation_rate = float(prediction["degradation_rate_seconds_per_lap"])
     drop_window = prediction["expected_performance_drop_window_laps"]
@@ -116,13 +148,17 @@ def strategy_analyzer(
     end_lap = max(drop_window[1], start_lap + 2)
     pit_window = [start_lap, end_lap]
 
-    undercut_risk = "high" if current_gap_seconds <= 1.5 and degradation_rate >= 0.25 else (
-        "medium" if current_gap_seconds <= 2.5 else "low"
+    undercut_risk = "high" if resolved_gap <= 1.5 and degradation_rate >= 0.25 else (
+        "medium" if resolved_gap <= 2.5 else "low"
     )
     overcut_risk = "high" if degradation_rate >= 0.45 else ("medium" if degradation_rate >= 0.25 else "low")
 
+    if competitor:
+        gap_assumption = f"Current gap to {competitor} (ahead): {resolved_gap:.1f}s."
+    else:
+        gap_assumption = f"Current gap to rival considered: {resolved_gap:.1f}s."
     assumptions = [
-        f"Current gap to rival considered: {current_gap_seconds:.1f}s.",
+        gap_assumption,
         "Historical pace delta assumed stable over next 5 laps.",
         "Tyre performance follows extracted degradation trend.",
     ]
@@ -146,6 +182,10 @@ def strategy_analyzer(
             "confidence_band": prediction["confidence_band"],
             "assumptions": assumptions,
             "rationale": rationale,
+            "current_gap_seconds": round(resolved_gap, 2),
+            "gap_source": gap_source,
+            "competitor_ahead": competitor,
+            "gap_sampled_at_lap": gap_lap,
         },
         "tyre_prediction": prediction,
     }

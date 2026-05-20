@@ -99,6 +99,110 @@ class StrategyHelperTests(unittest.TestCase):
         self.assertTrue(result["fallback"])
         self.assertEqual(result["strategy"]["undercut_risk"], "unknown")
 
+    @patch("tools.strategy_helper.get_current_gap_to_ahead")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_strategy_analyzer_uses_live_gap_from_fastf1(self, mock_predict, mock_gap):
+        # Slice 1A of #168: when caller doesn't pass current_gap_seconds we
+        # call FastF1 once for the live number. Verify it flows into the
+        # undercut classifier and surfaces in the response payload.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.31,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_gap.return_value = {
+            "gap_seconds": 1.4,
+            "driver_ahead": "VER",
+            "lap_number": 25,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+
+        result = strategy_analyzer(2024, "Bahrain Grand Prix", "R", "HAM")
+
+        mock_gap.assert_called_once_with(2024, "Bahrain Grand Prix", "R", "HAM")
+        strategy = result["strategy"]
+        self.assertEqual(strategy["gap_source"], "fastf1")
+        self.assertEqual(strategy["competitor_ahead"], "VER")
+        self.assertEqual(strategy["gap_sampled_at_lap"], 25)
+        self.assertEqual(strategy["current_gap_seconds"], 1.4)
+        # Gap 1.4s + degradation 0.31 → high undercut.
+        self.assertEqual(strategy["undercut_risk"], "high")
+        self.assertIn("VER", strategy["assumptions"][0])
+
+    @patch("tools.strategy_helper.get_current_gap_to_ahead")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_strategy_analyzer_falls_back_to_default_gap(self, mock_predict, mock_gap):
+        # When FastF1 is offline we keep the legacy 1.2s assumption so the
+        # undercut/overcut bands still make a call, just with low confidence.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.20,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_gap.return_value = {
+            "gap_seconds": None,
+            "driver_ahead": None,
+            "lap_number": None,
+            "fallback": True,
+            "fallback_reason": "FastF1 cache miss",
+        }
+
+        result = strategy_analyzer(2024, "Bahrain Grand Prix", "R", "HAM")
+
+        strategy = result["strategy"]
+        self.assertEqual(strategy["gap_source"], "fallback")
+        self.assertIsNone(strategy["competitor_ahead"])
+        self.assertEqual(strategy["current_gap_seconds"], 1.2)
+
+    @patch("tools.strategy_helper.get_current_gap_to_ahead")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_strategy_analyzer_explicit_gap_skips_fastf1(self, mock_predict, mock_gap):
+        # Tests + what-if scenarios pass an explicit gap. We must not
+        # call FastF1 in that case — it would burn a session.load() per
+        # parametrised test run.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.20,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+
+        result = strategy_analyzer(
+            2024, "Bahrain Grand Prix", "R", "HAM", current_gap_seconds=3.0
+        )
+
+        mock_gap.assert_not_called()
+        self.assertEqual(result["strategy"]["gap_source"], "explicit")
+        self.assertEqual(result["strategy"]["current_gap_seconds"], 3.0)
+        self.assertEqual(result["strategy"]["undercut_risk"], "low")
+
 
 if __name__ == "__main__":
     unittest.main()

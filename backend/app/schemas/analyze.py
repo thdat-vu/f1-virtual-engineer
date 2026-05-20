@@ -34,6 +34,22 @@ class StrategySummary(BaseModel):
     rationale: list[str]
     fallback: bool = False
     fallback_reason: str | None = None
+    current_gap_seconds: float | None = Field(
+        default=None,
+        description="Gap (s) to the car ahead at the sampled lap, or the fallback assumption when FastF1 lookup failed.",
+    )
+    gap_source: Literal["fastf1", "fallback", "explicit"] | None = Field(
+        default=None,
+        description="Where current_gap_seconds came from: live FastF1, hardcoded fallback, or an explicit caller override.",
+    )
+    competitor_ahead: str | None = Field(
+        default=None,
+        description="3-letter code of the driver running directly ahead at the sampled lap.",
+    )
+    gap_sampled_at_lap: int | None = Field(
+        default=None,
+        description="Lap number at which the gap was sampled.",
+    )
 
 
 class AnalyzeIntent(BaseModel):

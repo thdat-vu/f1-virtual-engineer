@@ -656,6 +656,112 @@ def extract_tyre_wear_features(
             },
         }
 
+def get_current_gap_to_ahead(
+    year: int,
+    event: str,
+    session_type: str,
+    driver: str,
+) -> dict[str, Any]:
+    """Return the live gap (seconds) from ``driver`` to the car ahead.
+
+    Used by ``strategy_analyzer`` to replace its old hardcoded 1.2s
+    placeholder. We pick the driver's last completed lap, look up who
+    was running directly ahead on that same lap, and difference the
+    cumulative ``Time`` column. ``Time`` is wall-clock since session
+    start, so the difference is the on-track gap at the lap line.
+
+    Returns a fail-closed envelope so callers never need to try/except:
+
+    - ``gap_seconds`` — seconds to driver ahead, or ``None`` if leader.
+    - ``driver_ahead`` — 3-letter code of the car ahead, or ``None``.
+    - ``lap_number`` — the lap the gap was sampled at.
+    - ``fallback`` / ``fallback_reason`` — populated when FastF1 hiccups
+      or the data is too thin (no laps, no position column, etc.).
+
+    Note: not wrapped in ``_ttl_cached`` because (a) it's only called
+    once per /analyze and the underlying session load is already cached
+    via fastf1's disk cache, and (b) gap drifts mid-session for live
+    weekends — caching at 24h would pin a stale number. Past sessions
+    cost ~50ms once warm.
+    """
+    driver = driver.upper()
+    try:
+        session = fastf1.get_session(year, event, session_type)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+        all_laps = session.laps
+        if all_laps.empty or "Position" not in all_laps.columns or "Time" not in all_laps.columns:
+            return {
+                "gap_seconds": None,
+                "driver_ahead": None,
+                "lap_number": None,
+                "fallback": True,
+                "fallback_reason": "Position or Time column missing from session laps.",
+            }
+
+        target_laps = all_laps.pick_driver(driver).dropna(subset=["Position", "Time"])
+        if target_laps.empty:
+            return {
+                "gap_seconds": None,
+                "driver_ahead": None,
+                "lap_number": None,
+                "fallback": True,
+                "fallback_reason": f"No timed laps with position data for driver {driver}.",
+            }
+
+        last_lap = target_laps.iloc[-1]
+        lap_number = int(last_lap["LapNumber"]) if pd.notna(last_lap.get("LapNumber")) else None
+        position = int(last_lap["Position"])
+        if position <= 1:
+            return {
+                "gap_seconds": None,
+                "driver_ahead": None,
+                "lap_number": lap_number,
+                "fallback": False,
+                "fallback_reason": None,
+            }
+
+        same_lap = all_laps[all_laps["LapNumber"] == last_lap["LapNumber"]].dropna(
+            subset=["Position", "Time"]
+        )
+        ahead_rows = same_lap[same_lap["Position"] == position - 1]
+        if ahead_rows.empty:
+            return {
+                "gap_seconds": None,
+                "driver_ahead": None,
+                "lap_number": lap_number,
+                "fallback": True,
+                "fallback_reason": f"No driver in position {position - 1} on lap {lap_number}.",
+            }
+
+        ahead = ahead_rows.iloc[0]
+        try:
+            gap_seconds = float((last_lap["Time"] - ahead["Time"]).total_seconds())
+        except (AttributeError, TypeError):
+            return {
+                "gap_seconds": None,
+                "driver_ahead": None,
+                "lap_number": lap_number,
+                "fallback": True,
+                "fallback_reason": "Time column not a Timedelta; cannot diff.",
+            }
+
+        return {
+            "gap_seconds": round(max(gap_seconds, 0.0), 2),
+            "driver_ahead": str(ahead["Driver"]).upper() if pd.notna(ahead.get("Driver")) else None,
+            "lap_number": lap_number,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+    except Exception as exc:  # noqa: BLE001 — fail-closed
+        return {
+            "gap_seconds": None,
+            "driver_ahead": None,
+            "lap_number": None,
+            "fallback": True,
+            "fallback_reason": str(exc),
+        }
+
+
 if __name__ == "__main__":
     # Test script: Fetch Hamilton's telemetry from 2023 Japan GP
     print("Fetching Lewis Hamilton's telemetry from 2023 Japanese GP...")
