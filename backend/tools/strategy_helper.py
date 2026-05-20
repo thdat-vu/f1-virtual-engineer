@@ -4,6 +4,7 @@ from core.trace import traced
 from tools.fastf1_helper import (
     extract_tyre_wear_features as _raw_extract_tyre_wear_features,
     get_current_gap_to_ahead,
+    get_gap_to_competitor,
 )
 
 extract_tyre_wear_features = traced("tyre_wear")(_raw_extract_tyre_wear_features)
@@ -93,13 +94,20 @@ def strategy_analyzer(
     session_type: str,
     driver: str,
     current_gap_seconds: float | None = None,
+    target_driver: str | None = None,
 ) -> dict[str, Any]:
     """
     Build pit-window recommendation using tyre wear prediction and pace assumptions.
 
-    ``current_gap_seconds`` is computed from FastF1 by default (gap to the
-    car ahead at the driver's last lap). Pass an explicit value to skip
-    the FastF1 lookup — handy in tests and for what-if scenarios.
+    Gap resolution order:
+    1. ``current_gap_seconds`` — explicit override, skips FastF1 entirely.
+    2. ``target_driver`` — measure gap to a specific competitor (slice 1B
+       of #168). The competitor may be ahead or behind; the panel still
+       classifies undercut/overcut from ``driver``'s perspective.
+    3. Otherwise — gap to the car directly ahead (slice 1A default).
+
+    Falls back to the legacy 1.2s assumption when the chosen lookup
+    returns a fallback envelope.
     """
     tyre_prediction = predict_tyre_wear(year, event, session_type, driver)
 
@@ -121,14 +129,27 @@ def strategy_analyzer(
             },
         }
 
-    # Resolve gap once. Honor explicit caller overrides; otherwise fetch
-    # from FastF1 and degrade to the legacy 1.2s assumption on fallback.
     competitor: str | None = None
+    competitor_position_relative: str | None = None
     gap_lap: int | None = None
     gap_source: str
     if current_gap_seconds is not None:
         resolved_gap = float(current_gap_seconds)
         gap_source = "explicit"
+    elif target_driver:
+        gap_envelope = get_gap_to_competitor(
+            year, event, session_type, driver, target_driver
+        )
+        if gap_envelope.get("fallback") or gap_envelope.get("gap_seconds") is None:
+            resolved_gap = _GAP_FALLBACK_SECONDS
+            gap_source = "fallback"
+            competitor = target_driver.upper()
+        else:
+            resolved_gap = float(gap_envelope["gap_seconds"])
+            competitor = target_driver.upper()
+            competitor_position_relative = gap_envelope.get("competitor_position_relative")
+            gap_lap = gap_envelope.get("lap_number")
+            gap_source = "fastf1"
     else:
         gap_envelope = get_current_gap_to_ahead(year, event, session_type, driver)
         if gap_envelope.get("fallback") or gap_envelope.get("gap_seconds") is None:
@@ -137,6 +158,7 @@ def strategy_analyzer(
         else:
             resolved_gap = float(gap_envelope["gap_seconds"])
             competitor = gap_envelope.get("driver_ahead")
+            competitor_position_relative = "ahead"
             gap_lap = gap_envelope.get("lap_number")
             gap_source = "fastf1"
 
@@ -154,7 +176,12 @@ def strategy_analyzer(
     overcut_risk = "high" if degradation_rate >= 0.45 else ("medium" if degradation_rate >= 0.25 else "low")
 
     if competitor:
-        gap_assumption = f"Current gap to {competitor} (ahead): {resolved_gap:.1f}s."
+        rel = (
+            f" ({competitor_position_relative})"
+            if competitor_position_relative in ("ahead", "behind")
+            else ""
+        )
+        gap_assumption = f"Current gap to {competitor}{rel}: {resolved_gap:.1f}s."
     else:
         gap_assumption = f"Current gap to rival considered: {resolved_gap:.1f}s."
     assumptions = [
@@ -185,6 +212,7 @@ def strategy_analyzer(
             "current_gap_seconds": round(resolved_gap, 2),
             "gap_source": gap_source,
             "competitor_ahead": competitor,
+            "competitor_position_relative": competitor_position_relative,
             "gap_sampled_at_lap": gap_lap,
         },
         "tyre_prediction": prediction,

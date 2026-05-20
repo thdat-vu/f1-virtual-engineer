@@ -140,6 +140,7 @@ class AgentState(TypedDict):
     rationale_source: str  # "llm" or "template"
     citations: list[dict[str, Any]]
     force_template: bool
+    target_driver: str | None  # slice 1B of #168 — competitor selector
 
 
 def parse_query_intent(query: str) -> dict[str, Any]:
@@ -305,6 +306,7 @@ def run_analysis_node(state: AgentState) -> AgentState:
             event=intent["event"],
             session_type=intent["session_type"],
             driver=intent["driver"],
+            target_driver=state.get("target_driver"),
         )
         new_memory_vals["last_strategy_data"] = strategy
         memory.update(new_memory_vals)
@@ -511,6 +513,7 @@ def analyze_query(
     *,
     session_override: dict[str, Any] | None = None,
     driver_override: str | None = None,
+    target_driver: str | None = None,
     force_template: bool = False,
 ) -> dict[str, Any]:
     import copy
@@ -549,6 +552,7 @@ def analyze_query(
                 "rationale_source": "template",
                 "citations": citations,
                 "force_template": force_template,
+                "target_driver": target_driver.upper() if target_driver else None,
             },
             config={"recursion_limit": MAX_GRAPH_STEPS},
         )

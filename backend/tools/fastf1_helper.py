@@ -762,6 +762,115 @@ def get_current_gap_to_ahead(
         }
 
 
+def get_gap_to_competitor(
+    year: int,
+    event: str,
+    session_type: str,
+    driver: str,
+    target_driver: str,
+) -> dict[str, Any]:
+    """Return the signed gap (s) between ``driver`` and ``target_driver``.
+
+    Sister of ``get_current_gap_to_ahead``. The "ahead" version locks
+    onto whoever is in position-1; this one locks onto a *specific*
+    competitor the user picked. Slice 1B of #168.
+
+    The gap is sampled at the most recent lap both drivers completed
+    with a valid ``Time`` — if one of them retired or pitted out of
+    sync, we walk back to the last shared lap.
+
+    Returns a fail-closed envelope:
+
+    - ``gap_seconds`` — magnitude in seconds (always >= 0).
+    - ``competitor_position_relative`` — ``"ahead"`` or ``"behind"``,
+      relative to ``driver``.
+    - ``lap_number`` — lap the gap was sampled at.
+    - ``fallback`` / ``fallback_reason`` — populated when FastF1 hiccups.
+    """
+    driver = driver.upper()
+    target_driver = target_driver.upper()
+
+    if driver == target_driver:
+        return {
+            "gap_seconds": 0.0,
+            "competitor_position_relative": "ahead",
+            "lap_number": None,
+            "fallback": True,
+            "fallback_reason": "Driver and target are the same.",
+        }
+
+    try:
+        session = fastf1.get_session(year, event, session_type)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+        all_laps = session.laps
+        if all_laps.empty or "Time" not in all_laps.columns:
+            return {
+                "gap_seconds": None,
+                "competitor_position_relative": None,
+                "lap_number": None,
+                "fallback": True,
+                "fallback_reason": "Time column missing from session laps.",
+            }
+
+        driver_laps = all_laps.pick_driver(driver).dropna(subset=["Time"])
+        target_laps = all_laps.pick_driver(target_driver).dropna(subset=["Time"])
+        if driver_laps.empty or target_laps.empty:
+            return {
+                "gap_seconds": None,
+                "competitor_position_relative": None,
+                "lap_number": None,
+                "fallback": True,
+                "fallback_reason": (
+                    f"No timed laps for {driver if driver_laps.empty else target_driver}."
+                ),
+            }
+
+        shared = set(driver_laps["LapNumber"].dropna().astype(int)) & set(
+            target_laps["LapNumber"].dropna().astype(int)
+        )
+        if not shared:
+            return {
+                "gap_seconds": None,
+                "competitor_position_relative": None,
+                "lap_number": None,
+                "fallback": True,
+                "fallback_reason": f"{driver} and {target_driver} share no completed laps.",
+            }
+        last_shared_lap = max(shared)
+
+        driver_row = driver_laps[driver_laps["LapNumber"] == last_shared_lap].iloc[0]
+        target_row = target_laps[target_laps["LapNumber"] == last_shared_lap].iloc[0]
+
+        try:
+            delta = float((driver_row["Time"] - target_row["Time"]).total_seconds())
+        except (AttributeError, TypeError):
+            return {
+                "gap_seconds": None,
+                "competitor_position_relative": None,
+                "lap_number": int(last_shared_lap),
+                "fallback": True,
+                "fallback_reason": "Time column not a Timedelta; cannot diff.",
+            }
+
+        # delta > 0 → driver crossed the line later → competitor is ahead.
+        relative = "ahead" if delta > 0 else "behind"
+        return {
+            "gap_seconds": round(abs(delta), 2),
+            "competitor_position_relative": relative,
+            "lap_number": int(last_shared_lap),
+            "fallback": False,
+            "fallback_reason": None,
+        }
+    except Exception as exc:  # noqa: BLE001 — fail-closed
+        return {
+            "gap_seconds": None,
+            "competitor_position_relative": None,
+            "lap_number": None,
+            "fallback": True,
+            "fallback_reason": str(exc),
+        }
+
+
 if __name__ == "__main__":
     # Test script: Fetch Hamilton's telemetry from 2023 Japan GP
     print("Fetching Lewis Hamilton's telemetry from 2023 Japanese GP...")

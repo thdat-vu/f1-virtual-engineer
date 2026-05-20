@@ -203,6 +203,85 @@ class StrategyHelperTests(unittest.TestCase):
         self.assertEqual(result["strategy"]["current_gap_seconds"], 3.0)
         self.assertEqual(result["strategy"]["undercut_risk"], "low")
 
+    @patch("tools.strategy_helper.get_gap_to_competitor")
+    @patch("tools.strategy_helper.get_current_gap_to_ahead")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_strategy_analyzer_uses_target_competitor(self, mock_predict, mock_ahead, mock_competitor):
+        # Slice 1B of #168: when target_driver is set we should call the
+        # competitor-specific helper and ignore the "ahead" lookup.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.30,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_competitor.return_value = {
+            "gap_seconds": 1.4,
+            "competitor_position_relative": "ahead",
+            "lap_number": 25,
+            "fallback": False,
+            "fallback_reason": None,
+        }
+
+        result = strategy_analyzer(
+            2024, "Bahrain Grand Prix", "R", "HAM", target_driver="ver"
+        )
+
+        mock_competitor.assert_called_once_with(
+            2024, "Bahrain Grand Prix", "R", "HAM", "ver"
+        )
+        mock_ahead.assert_not_called()
+        strategy = result["strategy"]
+        self.assertEqual(strategy["gap_source"], "fastf1")
+        self.assertEqual(strategy["competitor_ahead"], "VER")
+        self.assertEqual(strategy["competitor_position_relative"], "ahead")
+        self.assertEqual(strategy["current_gap_seconds"], 1.4)
+        self.assertEqual(strategy["undercut_risk"], "high")
+
+    @patch("tools.strategy_helper.get_gap_to_competitor")
+    @patch("tools.strategy_helper.predict_tyre_wear")
+    def test_target_competitor_fallback_keeps_competitor_label(self, mock_predict, mock_competitor):
+        # If FastF1 errors out we still want the UI to show who the user
+        # picked — just with the legacy 1.2s assumption flagged.
+        mock_predict.return_value = {
+            "driver": "HAM",
+            "year": 2024,
+            "event": "Bahrain Grand Prix",
+            "session_type": "R",
+            "fallback": False,
+            "fallback_reason": None,
+            "prediction": {
+                "degradation_rate_seconds_per_lap": 0.20,
+                "confidence_band": "medium",
+                "expected_performance_drop_window_laps": [8, 14],
+                "reasons": [],
+            },
+        }
+        mock_competitor.return_value = {
+            "gap_seconds": None,
+            "competitor_position_relative": None,
+            "lap_number": None,
+            "fallback": True,
+            "fallback_reason": "FastF1 down",
+        }
+
+        result = strategy_analyzer(
+            2024, "Bahrain Grand Prix", "R", "HAM", target_driver="VER"
+        )
+
+        strategy = result["strategy"]
+        self.assertEqual(strategy["gap_source"], "fallback")
+        self.assertEqual(strategy["competitor_ahead"], "VER")
+        self.assertEqual(strategy["current_gap_seconds"], 1.2)
+
 
 if __name__ == "__main__":
     unittest.main()

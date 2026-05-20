@@ -9,6 +9,7 @@ from tools.fastf1_helper import (
     _reset_caches_for_tests,
     extract_tyre_wear_features,
     get_current_gap_to_ahead,
+    get_gap_to_competitor,
     get_session_lap_list,
     get_session_telemetry_summary,
 )
@@ -386,6 +387,86 @@ class GetCurrentGapToAheadTests(unittest.TestCase):
 
         result = get_current_gap_to_ahead(2024, "Bahrain Grand Prix", "R", "HAM")
 
+        self.assertTrue(result["fallback"])
+        self.assertIsNone(result["gap_seconds"])
+
+
+class GetGapToCompetitorTests(unittest.TestCase):
+    """Slice 1B of #168: signed gap to a user-picked competitor."""
+
+    def setUp(self) -> None:
+        _reset_caches_for_tests()
+
+    def _make_session(self, laps_df: pd.DataFrame) -> MagicMock:
+        session = MagicMock()
+        session.load = MagicMock()
+        session.laps = _FakeLaps(laps_df)
+        return session
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_returns_positive_gap_when_competitor_is_ahead(self, mock_get_session):
+        # HAM crossed the line 1.4s after VER on lap 25 → competitor ahead.
+        laps_df = pd.DataFrame(
+            {
+                "Driver":    ["VER", "HAM", "VER", "HAM"],
+                "LapNumber": [24,    24,    25,    25],
+                "Time":      pd.to_timedelta([1500.0, 1501.5, 1590.0, 1591.4], unit="s"),
+            }
+        )
+        mock_get_session.return_value = self._make_session(laps_df)
+
+        result = get_gap_to_competitor(2024, "Bahrain Grand Prix", "R", "ham", "ver")
+
+        self.assertFalse(result["fallback"])
+        self.assertEqual(result["competitor_position_relative"], "ahead")
+        self.assertAlmostEqual(result["gap_seconds"], 1.4, places=2)
+        self.assertEqual(result["lap_number"], 25)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_returns_behind_when_competitor_is_behind(self, mock_get_session):
+        # NOR is 2.0s behind HAM on lap 25 → competitor behind.
+        laps_df = pd.DataFrame(
+            {
+                "Driver":    ["HAM", "NOR"],
+                "LapNumber": [25,    25],
+                "Time":      pd.to_timedelta([1591.0, 1593.0], unit="s"),
+            }
+        )
+        mock_get_session.return_value = self._make_session(laps_df)
+
+        result = get_gap_to_competitor(2024, "Bahrain Grand Prix", "R", "HAM", "NOR")
+
+        self.assertFalse(result["fallback"])
+        self.assertEqual(result["competitor_position_relative"], "behind")
+        self.assertAlmostEqual(result["gap_seconds"], 2.0, places=2)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_falls_back_when_no_shared_laps(self, mock_get_session):
+        # HAM lap 25, NOR lap 24 → no shared lap (NOR retired before HAM's last).
+        laps_df = pd.DataFrame(
+            {
+                "Driver":    ["HAM", "NOR"],
+                "LapNumber": [25,    24],
+                "Time":      pd.to_timedelta([1591.0, 1500.0], unit="s"),
+            }
+        )
+        mock_get_session.return_value = self._make_session(laps_df)
+
+        result = get_gap_to_competitor(2024, "Bahrain Grand Prix", "R", "HAM", "NOR")
+
+        self.assertTrue(result["fallback"])
+        self.assertIsNone(result["gap_seconds"])
+
+    def test_same_driver_returns_self_compare_fallback(self):
+        # No FastF1 call needed — guard short-circuits before session.load().
+        result = get_gap_to_competitor(2024, "Bahrain Grand Prix", "R", "HAM", "HAM")
+        self.assertTrue(result["fallback"])
+        self.assertEqual(result["gap_seconds"], 0.0)
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_fastf1_exception_is_fail_closed(self, mock_get_session):
+        mock_get_session.side_effect = RuntimeError("FastF1 cache miss")
+        result = get_gap_to_competitor(2024, "Bahrain Grand Prix", "R", "HAM", "VER")
         self.assertTrue(result["fallback"])
         self.assertIsNone(result["gap_seconds"])
 

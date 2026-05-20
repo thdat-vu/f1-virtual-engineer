@@ -341,6 +341,7 @@ async def analyze_race_data(
             body.query,
             session_override=session_override,
             driver_override=body.driver,
+            target_driver=body.target_driver,
             force_template=rationale_async,
         )
 

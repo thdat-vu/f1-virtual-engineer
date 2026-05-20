@@ -22,6 +22,16 @@ class AnalyzeRequest(BaseModel):
         default=None,
         description="Optional explicit session context to align frontend and backend assumptions",
     )
+    target_driver: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=3,
+        description=(
+            "Optional 3-letter code of the competitor to measure gap against. "
+            "When omitted the strategy analyzer uses the car directly ahead. "
+            "Slice 1B of #168."
+        ),
+    )
 
 
 class StrategySummary(BaseModel):
@@ -44,7 +54,11 @@ class StrategySummary(BaseModel):
     )
     competitor_ahead: str | None = Field(
         default=None,
-        description="3-letter code of the driver running directly ahead at the sampled lap.",
+        description="3-letter code of the driver the gap was measured against (car directly ahead by default, or the user-picked target).",
+    )
+    competitor_position_relative: Literal["ahead", "behind"] | None = Field(
+        default=None,
+        description="Where the picked competitor sits relative to driver. Always 'ahead' when no target was specified.",
     )
     gap_sampled_at_lap: int | None = Field(
         default=None,
