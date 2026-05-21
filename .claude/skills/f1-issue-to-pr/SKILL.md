@@ -81,9 +81,11 @@ Conventional Commits with monorepo scopes:
 - `fix(frontend): handle telemetry empty state`
 - `docs(repo): update workflow guide`
 
+**No AI attribution.** Never append `Co-Authored-By: Claude`, `🤖 Generated with Claude Code`, or any equivalent line to commit messages or PR bodies in this repo. The repo owner removes them every time; just skip them at the source.
+
 ## Phase 8 — PR
 
-Open the PR against `develop` with sections: **Summary**, **Why**, **What changed**, **Verification**, **Risks / follow-ups**. Use `gh pr create` with a HEREDOC body.
+Open the PR against `develop` with sections: **Summary**, **Why**, **What changed**, **Verification**, **Risks / follow-ups**. Use `gh pr create` with a HEREDOC body. Same no-AI-attribution rule applies — no trailing "Generated with…" line in the description.
 
 ## Deeper detail
 
