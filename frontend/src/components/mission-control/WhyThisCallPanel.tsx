@@ -31,13 +31,15 @@ export function WhyThisCallPanel({
   const fallback = strat?.fallback ?? false;
   const fallbackReason = strat?.fallback_reason ?? null;
 
-  const idleRationale = [
-    "Awaiting session selection.",
-    "Tyre degradation model ready.",
-    "Pace delta tracking idle.",
-    "Competitor windows standby.",
-  ];
-  const rationaleLines = hasData && rationale.length ? rationale : idleRationale;
+  // Issue #183: render nothing when there's no strategy payload to
+  // explain. The old idle copy ("Awaiting session selection · Tyre
+  // degradation model ready · …") was a placeholder that survived
+  // even after a successful telemetry-only analysis, which read as
+  // "the rationale model didn't run." Better to hide the panel
+  // entirely and give the vertical room back to the rest of the HUD.
+  if (!hasData || rationale.length === 0) {
+    return null;
+  }
 
   // Source pill colors: LLM = info (blue), template = warn (amber) so a
   // reviewer can tell at a glance whether they're reading Gemini text or
@@ -84,9 +86,9 @@ export function WhyThisCallPanel({
             )}
 
             <ul className="mt-3 space-y-2">
-              {rationaleLines.map((line, i) => (
+              {rationale.map((line, i) => (
                 <motion.li
-                  key={`${rationaleSource ?? "idle"}-${i}`}
+                  key={`${rationaleSource ?? "rationale"}-${i}`}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.25 }}
@@ -98,7 +100,7 @@ export function WhyThisCallPanel({
               ))}
             </ul>
 
-            {hasData && assumptions.length > 0 && (
+            {assumptions.length > 0 && (
               <div className="mt-4">
                 <p className="label mb-2 text-[0.55rem]">Assumptions</p>
                 <ul className="space-y-1.5">
@@ -115,7 +117,7 @@ export function WhyThisCallPanel({
               </div>
             )}
 
-            {hasData && fallback && (
+            {fallback && (
               <div
                 className="status-bar mt-4 border p-2"
                 data-status="warn"
