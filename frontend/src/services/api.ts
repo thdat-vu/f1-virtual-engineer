@@ -38,6 +38,10 @@ export interface StrategyData {
   // Slice 1C of #168: pit-loss + undercut break-even projection.
   pit_loss_seconds?: number | null;
   undercut_break_even_laps?: number | null;
+  // Slice 1D of #168: net seconds gained if we undercut now and the
+  // rival reacts in ~3 laps. Null when gap is too large for the window
+  // to overcome — UI hides the line in that case.
+  expected_gain_seconds?: number | null;
 }
 
 export interface AnalyzeResponse {

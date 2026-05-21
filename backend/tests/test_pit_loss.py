@@ -6,6 +6,7 @@ import unittest
 
 from tools.pit_loss import (
     DEFAULT_PIT_LOSS_SECONDS,
+    estimate_expected_undercut_gain_seconds,
     estimate_undercut_break_even_laps,
     lookup_pit_loss_seconds,
 )
@@ -83,6 +84,62 @@ class EstimateUndercutBreakEvenLapsTests(unittest.TestCase):
             gap_seconds=0.1, degradation_per_lap=0.3
         )
         self.assertEqual(result, 1)
+
+
+class EstimateExpectedUndercutGainSecondsTests(unittest.TestCase):
+    def test_classic_undercut_returns_positive_gain(self):
+        # gap 1.4s, deg 0.3 → advantage 0.8s/lap → 3-lap window gain
+        # 2.4s, minus the 1.4s gap → net 1.0s ahead.
+        result = estimate_expected_undercut_gain_seconds(
+            gap_seconds=1.4, degradation_per_lap=0.3
+        )
+        self.assertAlmostEqual(result or 0.0, 1.0, places=2)
+
+    def test_gap_too_large_returns_none(self):
+        # gap 5.0s with deg 0.2 → advantage 0.7/lap → 3 laps recovers
+        # 2.1s, still 2.9s short. Hide the line rather than show a
+        # negative gain that contradicts the rest of the panel.
+        self.assertIsNone(
+            estimate_expected_undercut_gain_seconds(
+                gap_seconds=5.0, degradation_per_lap=0.2
+            )
+        )
+
+    def test_zero_or_negative_gap_returns_none(self):
+        # Already ahead — undercut math doesn't apply.
+        self.assertIsNone(
+            estimate_expected_undercut_gain_seconds(
+                gap_seconds=0.0, degradation_per_lap=0.3
+            )
+        )
+        self.assertIsNone(
+            estimate_expected_undercut_gain_seconds(
+                gap_seconds=-1.0, degradation_per_lap=0.3
+            )
+        )
+
+    def test_zero_degradation_still_uses_fresh_tyre_bonus(self):
+        # gap 1.0s, deg 0 → advantage 0.5/lap → 3-lap window 1.5s,
+        # net 0.5s. Mirrors the break-even helper's behaviour so the
+        # two stay consistent.
+        result = estimate_expected_undercut_gain_seconds(
+            gap_seconds=1.0, degradation_per_lap=0.0
+        )
+        self.assertAlmostEqual(result or 0.0, 0.5, places=2)
+
+    def test_custom_reaction_window_changes_gain(self):
+        # If we ever decide rivals react faster (e.g. 2 laps for a top
+        # team) the math should scale linearly. Same gap+deg, half the
+        # window → half the rolled-up advantage minus same gap.
+        narrow = estimate_expected_undercut_gain_seconds(
+            gap_seconds=1.0, degradation_per_lap=0.5, reaction_window_laps=2
+        )
+        wide = estimate_expected_undercut_gain_seconds(
+            gap_seconds=1.0, degradation_per_lap=0.5, reaction_window_laps=4
+        )
+        self.assertIsNotNone(narrow)
+        self.assertIsNotNone(wide)
+        self.assertGreater(wide or 0.0, narrow or 0.0)
 
 
 if __name__ == "__main__":

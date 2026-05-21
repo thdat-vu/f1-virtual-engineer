@@ -253,6 +253,18 @@ export function StrategyHUD({
                     </span>
                   </>
                 )}
+                {strat.expected_gain_seconds != null && (
+                  <>
+                    {" · gain "}
+                    <span
+                      className="font-bold"
+                      style={{ color: "var(--status-ok)" }}
+                      title="Net seconds ahead of rival once they react and pit ~3 laps later"
+                    >
+                      ~{strat.expected_gain_seconds.toFixed(1)}s
+                    </span>
+                  </>
+                )}
               </p>
             )}
             {strat.fallback && (

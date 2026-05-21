@@ -324,6 +324,9 @@ class StrategyHelperTests(unittest.TestCase):
         # Japan = 22s pit loss; advantage ~0.8s/lap → 2-lap break-even.
         self.assertEqual(strategy["pit_loss_seconds"], 22.0)
         self.assertEqual(strategy["undercut_break_even_laps"], 2)
+        # Slice 1D: expected gain over a 3-lap rival reaction window.
+        # 3 × 0.8 − 1.4 = 1.0s.
+        self.assertAlmostEqual(strategy["expected_gain_seconds"], 1.0, places=2)
 
     @patch("tools.strategy_helper.get_gap_to_competitor")
     @patch("tools.strategy_helper.predict_tyre_wear")
@@ -362,6 +365,8 @@ class StrategyHelperTests(unittest.TestCase):
         strategy = result["strategy"]
         self.assertEqual(strategy["pit_loss_seconds"], 22.0)
         self.assertIsNone(strategy["undercut_break_even_laps"])
+        # Slice 1D: expected_gain hides too — same is_chasing gate.
+        self.assertIsNone(strategy["expected_gain_seconds"])
 
 
 if __name__ == "__main__":

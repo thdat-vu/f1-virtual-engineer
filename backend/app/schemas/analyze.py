@@ -76,6 +76,15 @@ class StrategySummary(BaseModel):
             "Slice 1C of #168."
         ),
     )
+    expected_gain_seconds: float | None = Field(
+        default=None,
+        description=(
+            "Net seconds gained if the driver pits now and the rival reacts in "
+            "~3 laps. None when chasing isn't applicable, the gap is too large "
+            "for the reaction window to overcome, or the projection would be "
+            "non-positive. Slice 1D of #168."
+        ),
+    )
 
 
 class AnalyzeIntent(BaseModel):

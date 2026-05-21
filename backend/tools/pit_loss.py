@@ -65,6 +65,13 @@ useful (the band/order of magnitude) rather than blanking out."""
 # below this would let degradation=0 cases project undercut_laps→infinity.
 _BASELINE_FRESH_TYRE_ADVANTAGE = 0.5
 
+# How many laps the rival typically stays out after seeing us pit. ~3
+# laps is a reasonable race-engineer default: ~1 to confirm the threat,
+# ~1 to call it, ~1 for the driver to actually box. Used to project the
+# *net* gain of an undercut over a realistic settling window rather
+# than the instantaneous break-even.
+_UNDERCUT_REACTION_WINDOW_LAPS = 3
+
 
 def lookup_pit_loss_seconds(event: str | None) -> float:
     """Return the pit-loss for ``event`` in seconds, or the default.
@@ -108,3 +115,38 @@ def estimate_undercut_break_even_laps(
         return None
     laps = math.ceil(gap_seconds / advantage)
     return max(1, laps)
+
+
+def estimate_expected_undercut_gain_seconds(
+    *,
+    gap_seconds: float,
+    degradation_per_lap: float,
+    reaction_window_laps: int = _UNDERCUT_REACTION_WINDOW_LAPS,
+) -> float | None:
+    """Net seconds gained if I undercut now and rival reacts in ~3 laps.
+
+    Companion to ``estimate_undercut_break_even_laps``. Break-even tells
+    you *when* the undercut crosses parity; this tells you *how much*
+    you're ahead once everyone settles. The race-engineer question this
+    answers: "is this worth doing, or am I just trading positions?"
+
+    Math: over the reaction window I gain ``advantage_per_lap`` per lap
+    on the rival. They erase ``gap_seconds`` of cushion when they pit
+    later. Net at the moment they emerge:
+
+        net_gain = (reaction_laps × advantage_per_lap) − gap_seconds
+
+    Returns ``None`` when net_gain is non-positive (gap too large for
+    the reaction window to overcome) — the UI hides the line so we
+    don't show a "gain ~-0.4s" callout that contradicts the green
+    "undercut viable" framing above it.
+    """
+    if gap_seconds <= 0:
+        return None
+    advantage = max(degradation_per_lap + _BASELINE_FRESH_TYRE_ADVANTAGE, 0.0)
+    if advantage < _BASELINE_FRESH_TYRE_ADVANTAGE * 0.5:
+        return None
+    net_gain = reaction_window_laps * advantage - gap_seconds
+    if net_gain <= 0:
+        return None
+    return round(net_gain, 2)

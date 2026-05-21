@@ -7,6 +7,7 @@ from tools.fastf1_helper import (
     get_gap_to_competitor,
 )
 from tools.pit_loss import (
+    estimate_expected_undercut_gain_seconds,
     estimate_undercut_break_even_laps,
     lookup_pit_loss_seconds,
 )
@@ -196,6 +197,14 @@ def strategy_analyzer(
         if is_chasing
         else None
     )
+    expected_gain_seconds = (
+        estimate_expected_undercut_gain_seconds(
+            gap_seconds=resolved_gap,
+            degradation_per_lap=degradation_rate,
+        )
+        if is_chasing
+        else None
+    )
 
     if competitor:
         rel = (
@@ -222,6 +231,10 @@ def strategy_analyzer(
             f"Undercut breaks even after ~{undercut_break_even_laps} laps "
             f"(gap {resolved_gap:.1f}s vs ~{degradation_rate + 0.5:.2f}s/lap pace swing)."
         )
+    if expected_gain_seconds is not None:
+        rationale.append(
+            f"Expected net gain ~{expected_gain_seconds:.1f}s after a ~3-lap rival reaction."
+        )
 
     return {
         "driver": driver.upper(),
@@ -244,6 +257,7 @@ def strategy_analyzer(
             "gap_sampled_at_lap": gap_lap,
             "pit_loss_seconds": round(pit_loss_seconds, 1),
             "undercut_break_even_laps": undercut_break_even_laps,
+            "expected_gain_seconds": expected_gain_seconds,
         },
         "tyre_prediction": prediction,
     }
