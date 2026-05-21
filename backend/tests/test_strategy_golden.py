@@ -97,6 +97,39 @@ class CompareTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertTrue(any("fallback" in f for f in result.failures))
 
+    def test_expected_gain_within_tolerance_passes(self):
+        # Slice 1D field is opt-in via the case dict — older cases
+        # without the key shouldn't trip on it.
+        case = {**SAMPLE_CASE, "expected": {**SAMPLE_CASE["expected"], "expected_gain_seconds": 1.0}}
+        actual = _actual()
+        actual["strategy"]["expected_gain_seconds"] = 1.2
+        result = _compare(case, actual)
+        self.assertTrue(result.passed, result.failures)
+
+    def test_expected_gain_outside_tolerance_fails(self):
+        case = {**SAMPLE_CASE, "expected": {**SAMPLE_CASE["expected"], "expected_gain_seconds": 1.0}}
+        actual = _actual()
+        actual["strategy"]["expected_gain_seconds"] = 2.0  # outside ±0.4
+        result = _compare(case, actual)
+        self.assertFalse(result.passed)
+        self.assertTrue(any("expected_gain_seconds" in f for f in result.failures))
+
+    def test_expected_gain_none_when_expected_none(self):
+        # Sprint / fallback scenarios assert the math is hidden.
+        case = {**SAMPLE_CASE, "expected": {**SAMPLE_CASE["expected"], "expected_gain_seconds": None}}
+        actual = _actual()
+        actual["strategy"]["expected_gain_seconds"] = None
+        result = _compare(case, actual)
+        self.assertTrue(result.passed, result.failures)
+
+    def test_expected_gain_unset_when_expected_value_fails(self):
+        case = {**SAMPLE_CASE, "expected": {**SAMPLE_CASE["expected"], "expected_gain_seconds": 1.0}}
+        actual = _actual()
+        actual["strategy"]["expected_gain_seconds"] = None
+        result = _compare(case, actual)
+        self.assertFalse(result.passed)
+        self.assertTrue(any("expected_gain_seconds" in f for f in result.failures))
+
 
 class GoldenSetTests(unittest.TestCase):
     def test_golden_file_is_well_formed(self):

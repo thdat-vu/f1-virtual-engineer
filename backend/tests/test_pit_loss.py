@@ -34,6 +34,12 @@ class LookupPitLossTests(unittest.TestCase):
         self.assertEqual(lookup_pit_loss_seconds("Canadian Grand Prix"), 16.5)
         self.assertEqual(lookup_pit_loss_seconds("British Grand Prix"), 22.0)
         self.assertEqual(lookup_pit_loss_seconds("Spanish Grand Prix"), 22.0)
+        # Slice 1D regression: Hungarian + Chinese were previously keyed
+        # as HUNGARY/CHINA which don't substring-match the adjective
+        # event names. Hungary's 20s value matters for the issue's
+        # HAM/ALO 2023 golden case.
+        self.assertEqual(lookup_pit_loss_seconds("Hungarian Grand Prix"), 20.0)
+        self.assertEqual(lookup_pit_loss_seconds("Chinese Grand Prix"), 22.0)
 
     def test_unknown_track_returns_default(self):
         # Future or hypothetical events fall back to the table median —
