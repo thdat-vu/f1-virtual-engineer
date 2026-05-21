@@ -60,7 +60,7 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | Capability | Status | Endpoint |
 | --- | --- | --- |
 | `get_telemetry` — speed/gear/RPM/throttle/brake summaries with fallback metadata | ✅ Shipped | `GET /telemetry`, `GET /laps/{...}` |
-| `strategy_analyzer` — pit-window recommendations with undercut/overcut risk and confidence band | ✅ Shipped | `POST /analyze` (strategy intent) |
+| `strategy_analyzer` — pit-window recommendations with undercut/overcut risk, confidence band, real FastF1 gap to a chosen rival, per-track pit-loss table, undercut break-even laps, and expected-gain projection over a 3-lap rival reaction window (#168) | ✅ Shipped | `POST /analyze` (strategy intent) |
 | `race_engineer_rationale` — Gemini Flash-generated natural-language summary, with deterministic template fallback when the LLM is unavailable. Optional async path (`RATIONALE_ASYNC=true`) returns the template instantly and back-fills the LLM rationale onto the persisted history row via a Celery worker — the frontend swaps the text in once it lands. | ✅ Shipped | `POST /analyze` (`rationale_source: "llm" \| "template"`, `analyze_history_id`, `rationale_job_id`) |
 | `radio_interpreter` — closed-set classification of team-radio transcripts (tyre/brake/engine/traffic/weather/strategy/none) with severity + trigger phrase | ✅ Shipped | `POST /radio/analyze` |
 | `predict_tyre_wear` — standalone tyre-degradation snapshot with compound, stint length, observed decay (s/lap), and projected cliff-lap | ✅ Shipped | `POST /tyre/analyze` |
