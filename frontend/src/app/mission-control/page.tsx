@@ -46,6 +46,12 @@ export default function MissionControlPage() {
   const [compareSpeedSeries, setCompareSpeedSeries]   = useState<number[] | null>(null);
   const [compareLoading, setCompareLoading]           = useState(false);
 
+  // Issue #182: explicit intent toggle. Default "telemetry" preserves the
+  // legacy fastest-lap compare behavior; "strategy" routes the analyze
+  // query through the regex classifier into strategy_analyzer so the Pit
+  // Window block + slice 1A→1D fields actually render.
+  const [intent, setIntent] = useState<"telemetry" | "strategy">("telemetry");
+
   // Cleared on the next successful Analyze; surfaced in StrategyHUD when set.
   const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
 
@@ -164,14 +170,25 @@ export default function MissionControlPage() {
     session: SessionId;
     driver: string;
     targetDriver?: string;
+    intent?: "telemetry" | "strategy";
   }) => {
     setIsLoading(true);
     setRateLimitMessage(null);
     setRetryState("idle");
     try {
+      // Strategy keyword in the query is what makes the backend regex
+      // classifier route to strategy_analyzer (#182). Telemetry mode
+      // keeps the original phrasing so existing history rows still
+      // round-trip with their telemetry intent.
+      const strategyMode = (args.intent ?? intent) === "strategy";
+      const query = strategyMode
+        ? args.targetDriver
+          ? `Pit strategy for ${args.driver} chasing ${args.targetDriver} at ${args.eventName} ${args.year} ${args.session}`
+          : `Pit strategy for ${args.driver} at ${args.eventName} ${args.year} ${args.session}`
+        : `Analyse ${args.driver} ${args.session} session at ${args.eventName} ${args.year}`;
       const res = await analyzeTelemetry(
         {
-          query: `Analyse ${args.driver} ${args.session} session at ${args.eventName} ${args.year}`,
+          query,
           driver: args.driver,
           session_info: { event: args.eventName, year: args.year, session_type: args.session },
           // Slice 1B of #168: when the user picked a "vs" driver, reuse
@@ -190,19 +207,17 @@ export default function MissionControlPage() {
         setRateLimitMessage(`Rate limited — retry in ${err.retryAfterSeconds}s`);
         setRetryState("idle");
       } else {
-        // Either the retry surfaced a response we couldn't parse, or both
-        // attempts hit a network error. Either way the user gets a CTA.
         setRetryState("failed");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [setIsLoading, setResult, authSession]);
+  }, [setIsLoading, setResult, authSession, intent]);
 
   const handleAnalyze = useCallback(async () => {
     if (!canRun) return;
-    await runAnalyze({ year, eventName, session, driver, targetDriver: compareDriver });
-  }, [canRun, year, eventName, session, driver, compareDriver, runAnalyze]);
+    await runAnalyze({ year, eventName, session, driver, targetDriver: compareDriver, intent });
+  }, [canRun, year, eventName, session, driver, compareDriver, intent, runAnalyze]);
 
   const handleSelectHistory = useCallback((item: AnalyzeHistoryItem) => {
     const nextYear = item.year ?? year;
@@ -307,6 +322,7 @@ export default function MissionControlPage() {
           compareDriver={compareDriver} setCompareDriver={setCompareDriver}
           compareLoading={compareLoading}
           setCompareSpeedSeries={setCompareSpeedSeries} setCompareLoading={setCompareLoading}
+          intent={intent} setIntent={setIntent}
           result={result} isLoading={isLoading} canRun={canRun} onAnalyze={handleAnalyze}
           savedQueries={savedQueries} onSavedQueriesChange={setSavedQueries}
         />

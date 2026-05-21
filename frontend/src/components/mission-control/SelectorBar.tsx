@@ -16,6 +16,7 @@ export function SelectorBar({
   setLaps, setFastestLapNumber, setLapsLoading, setLapOverlayLoading,
   compareDriver, setCompareDriver, compareLoading,
   setCompareSpeedSeries, setCompareLoading,
+  intent, setIntent,
   result, isLoading, canRun, onAnalyze,
   savedQueries, onSavedQueriesChange,
 }: {
@@ -50,6 +51,8 @@ export function SelectorBar({
   compareLoading: boolean;
   setCompareSpeedSeries: (v: number[] | null) => void;
   setCompareLoading: (v: boolean) => void;
+  intent: "telemetry" | "strategy";
+  setIntent: (v: "telemetry" | "strategy") => void;
   result: AnalyzeResponse | null;
   isLoading: boolean;
   canRun: boolean;
@@ -186,6 +189,36 @@ export function SelectorBar({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <div
+          role="tablist"
+          aria-label="Analysis intent"
+          className="flex shrink-0 overflow-hidden rounded-sm border border-border"
+        >
+          {(["telemetry", "strategy"] as const).map((id) => {
+            const active = intent === id;
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setIntent(id)}
+                title={
+                  id === "telemetry"
+                    ? "Compare lap traces (speed/throttle/brake)"
+                    : "Pit window, undercut math, gap to rival"
+                }
+                className="readout px-2.5 py-1 text-[0.55rem] font-bold uppercase tracking-[var(--track-wide)] transition-colors"
+                style={{
+                  background: active ? "var(--accent)" : "transparent",
+                  color: active ? "var(--background)" : "var(--foreground-dim)",
+                }}
+              >
+                {id}
+              </button>
+            );
+          })}
+        </div>
+
         <StarButton
           kind="analyze"
           payload={{
