@@ -32,6 +32,11 @@ if str(_BACKEND_DIR) not in sys.path:
 GOLDEN_PATH = Path(__file__).parent / "strategy_golden.jsonl"
 PIT_WINDOW_TOLERANCE_LAPS = 2
 DEGRADATION_TOLERANCE_SECONDS = 0.05
+# Looser band on expected_gain because pit-loss / reaction-window are
+# heuristics, not measurements. ±0.4s mirrors the issue acceptance and
+# still catches sign flips or off-by-an-order-of-magnitude regressions.
+EXPECTED_GAIN_TOLERANCE_SECONDS = 0.4
+UNDERCUT_BREAK_EVEN_TOLERANCE_LAPS = 1
 
 
 @dataclass
@@ -84,6 +89,35 @@ def _compare(case: dict[str, Any], actual: dict[str, Any]) -> CaseResult:
             f"degradation_rate_seconds_per_lap: expected {expected_deg} +/- {DEGRADATION_TOLERANCE_SECONDS}, got {actual_deg}"
         )
 
+    # Optional slice-1C/1D fields. Only assert when the case opts in by
+    # providing the key — keeps older cases in the JSONL valid without
+    # forcing them all to spell out undercut math they don't care about.
+    if "expected_gain_seconds" in expected:
+        actual_gain = strategy.get("expected_gain_seconds")
+        expected_gain = expected["expected_gain_seconds"]
+        if expected_gain is None:
+            if actual_gain is not None:
+                failures.append(f"expected_gain_seconds: expected None, got {actual_gain}")
+        elif actual_gain is None:
+            failures.append(f"expected_gain_seconds: expected ~{expected_gain}, got None")
+        elif abs(float(actual_gain) - float(expected_gain)) > EXPECTED_GAIN_TOLERANCE_SECONDS:
+            failures.append(
+                f"expected_gain_seconds: expected {expected_gain} +/- {EXPECTED_GAIN_TOLERANCE_SECONDS}, got {actual_gain}"
+            )
+
+    if "undercut_break_even_laps" in expected:
+        actual_be = strategy.get("undercut_break_even_laps")
+        expected_be = expected["undercut_break_even_laps"]
+        if expected_be is None:
+            if actual_be is not None:
+                failures.append(f"undercut_break_even_laps: expected None, got {actual_be}")
+        elif actual_be is None:
+            failures.append(f"undercut_break_even_laps: expected ~{expected_be}, got None")
+        elif abs(int(actual_be) - int(expected_be)) > UNDERCUT_BREAK_EVEN_TOLERANCE_LAPS:
+            failures.append(
+                f"undercut_break_even_laps: expected {expected_be} +/- {UNDERCUT_BREAK_EVEN_TOLERANCE_LAPS}, got {actual_be}"
+            )
+
     return CaseResult(case_id=case_id, passed=not failures, failures=failures)
 
 
@@ -95,11 +129,17 @@ def run_eval(cases_path: Path = GOLDEN_PATH) -> tuple[list[CaseResult], list[str
     results: list[CaseResult] = []
 
     for case in cases:
+        # Slice 1B/1D cases may pin a target_driver or an explicit gap
+        # so undercut math is exercised independently of the live FastF1
+        # gap-to-ahead lookup. Older cases omit both → strategy_analyzer
+        # falls back to its default behaviour (gap to car directly ahead).
         actual = strategy_analyzer(
             year=case["year"],
             event=case["event"],
             session_type=case["session_type"],
             driver=case["driver"],
+            target_driver=case.get("target_driver"),
+            current_gap_seconds=case.get("current_gap_seconds"),
         )
         results.append(_compare(case, actual))
 
