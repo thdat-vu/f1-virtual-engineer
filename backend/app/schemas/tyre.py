@@ -37,5 +37,13 @@ class TyreAnalyzeResponse(BaseModel):
         description="Projected stint-relative lap where pace drops; null when uncertain.",
     )
     confidence_band: Literal["high", "medium", "low"] = "low"
+    last_lap_number: int | None = Field(
+        default=None,
+        description=(
+            "Absolute lap number this snapshot reflects (last lap in the loaded roster). "
+            "Lets the UI clarify the call refers to end-of-session, not the lap currently "
+            "being viewed. Null on fallback or empty roster."
+        ),
+    )
     fallback: bool = False
     fallback_reason: str | None = None

@@ -65,6 +65,8 @@ class TyreHelperTests(unittest.TestCase):
         self.assertAlmostEqual(result["decay_seconds_per_lap"], 0.18)
         self.assertEqual(result["confidence_band"], "high")
         self.assertEqual(result["cliff_lap_estimate"], 8)
+        # #185: snapshot lap is the last lap in the loaded roster.
+        self.assertEqual(result["last_lap_number"], 20)
 
     def test_steep_decay_pulls_cliff_earlier(self):
         # Same window but decay > 0.45 — estimator should subtract 2.
@@ -114,6 +116,7 @@ class TyreHelperTests(unittest.TestCase):
         self.assertEqual(result["decay_seconds_per_lap"], 0.0)
         self.assertIsNone(result["cliff_lap_estimate"])
         self.assertEqual(result["confidence_band"], "low")
+        self.assertIsNone(result["last_lap_number"])
 
     def test_roster_fallback_keeps_prediction_data(self):
         # Lap roster blowing up must not blank the whole card — we still

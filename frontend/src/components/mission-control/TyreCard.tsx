@@ -148,6 +148,16 @@ export function TyreCard({
             {headline.text}
           </p>
 
+          {/* Issue #185: snapshot lap context. The card always reflects
+              the last lap in the loaded roster — without this line the
+              viewer can read "Past the cliff · pit now" as a call about
+              whatever lap they're currently viewing on the chart. */}
+          <p className="readout mt-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-foreground-faint">
+            {data.last_lap_number != null
+              ? `as of L${data.last_lap_number}`
+              : "as of last available lap"}
+          </p>
+
           {hasCliff && (
             <>
               <div

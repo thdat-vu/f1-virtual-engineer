@@ -622,6 +622,10 @@ export interface TyreAnalyzeResponse {
   decay_seconds_per_lap: number;
   cliff_lap_estimate: number | null;
   confidence_band: "high" | "medium" | "low";
+  // Issue #185: absolute lap number this snapshot was taken at, so the
+  // UI can show "as of L52" and the viewer doesn't read the card as
+  // a real-time call about whatever lap they're currently viewing.
+  last_lap_number?: number | null;
   fallback: boolean;
   fallback_reason?: string | null;
 }

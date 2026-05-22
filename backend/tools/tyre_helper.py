@@ -34,6 +34,7 @@ def _empty_envelope(
         "decay_seconds_per_lap": 0.0,
         "cliff_lap_estimate": None,
         "confidence_band": "low",
+        "last_lap_number": None,
     }
 
 
@@ -137,12 +138,22 @@ def compute_tyre_decay(
     # whole card.
     compound: str | None = None
     stint_laps: int = 0
+    last_lap_number: int | None = None
     try:
         roster = get_session_lap_list(year, event, session_type, driver)
         if not roster.get("fallback"):
-            compound, stint_laps = _last_stint_compound(roster.get("laps") or [])
+            laps_list = roster.get("laps") or []
+            compound, stint_laps = _last_stint_compound(laps_list)
+            # Issue #185: surface the absolute lap number this snapshot
+            # was taken at, so the UI can disambiguate "tyre call as of
+            # the last lap of the race" from "tyre call for the lap I'm
+            # currently viewing". Last lap in the roster is the snapshot.
+            if laps_list:
+                tail = laps_list[-1].get("lap_number")
+                if isinstance(tail, int):
+                    last_lap_number = tail
     except Exception:  # noqa: BLE001 — degrade silently
-        compound, stint_laps = None, 0
+        compound, stint_laps, last_lap_number = None, 0, None
 
     cliff = _cliff_lap_estimate(
         decay_per_lap=decay,
@@ -162,4 +173,5 @@ def compute_tyre_decay(
         "decay_seconds_per_lap": round(decay, 4),
         "cliff_lap_estimate": int(cliff) if cliff is not None else None,
         "confidence_band": confidence,
+        "last_lap_number": last_lap_number,
     }
