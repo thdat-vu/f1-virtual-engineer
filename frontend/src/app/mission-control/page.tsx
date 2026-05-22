@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
+import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getLapDelta, getTelemetry, RateLimitError } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapDeltaResponse, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
@@ -45,6 +45,12 @@ export default function MissionControlPage() {
   const [compareDriver, setCompareDriver]             = useState<string>("");
   const [compareSpeedSeries, setCompareSpeedSeries]   = useState<number[] | null>(null);
   const [compareLoading, setCompareLoading]           = useState(false);
+
+  // Issue #184: per-distance Δt(reference vs compare). Loading state is
+  // derived in the chart from "compareDriver set but no payload" — no
+  // separate flag needed, which also keeps us out of the
+  // react-hooks/set-state-in-effect rule.
+  const [lapDelta, setLapDelta] = useState<LapDeltaResponse | null>(null);
 
   // Issue #182: explicit intent toggle. Default "telemetry" preserves the
   // legacy fastest-lap compare behavior; "strategy" routes the analyze
@@ -157,6 +163,27 @@ export default function MissionControlPage() {
       .finally(() => { if (!cancelled) setCompareLoading(false); });
     return () => { cancelled = true; };
   }, [compareDriver, year, eventName, session, authSession]);
+
+  // Issue #184: lap-delta fetch. Triggers only when both drivers and a
+  // session/event are pinned. We don't synchronously flip a loading
+  // flag here — the chart derives "loading" as "compareDriver set but
+  // payload doesn't yet match the requested pair" (see lapDeltaLoading
+  // below). Keeps the effect side-effect-free at sync time and
+  // satisfies react-hooks/set-state-in-effect.
+  useEffect(() => {
+    if (!compareDriver || !driver || !eventName || compareDriver === driver) return;
+    let cancelled = false;
+    getLapDelta({
+      year,
+      event: eventName,
+      session_type: session,
+      reference_driver: driver,
+      compare_driver: compareDriver,
+    })
+      .then((res) => { if (!cancelled) setLapDelta(res); })
+      .catch(() => { if (!cancelled) setLapDelta(null); });
+    return () => { cancelled = true; };
+  }, [driver, compareDriver, year, eventName, session]);
 
   const canRun = !isLoading && !!eventName && !!driver;
 
@@ -290,6 +317,17 @@ export default function MissionControlPage() {
   const hasData = !isLoading && !!result;
   const animKey = result ? 1 : 0;
 
+  // Lap-delta loading is derived, not stored — the chart treats the
+  // request as in-flight whenever a compare driver is picked but the
+  // latest payload doesn't yet describe that driver pair.
+  const lapDeltaLoading = Boolean(
+    compareDriver && driver && (
+      !lapDelta ||
+      lapDelta.reference_driver !== driver ||
+      lapDelta.compare_driver !== compareDriver
+    ),
+  );
+
   const displayDriver = result?.intent?.driver ?? driver ?? "—";
   const displayEvent  = result?.intent?.event  ?? eventName ?? "—";
   const displayLap =
@@ -330,6 +368,7 @@ export default function MissionControlPage() {
         <TelemetryChartGrid
           tel={tel} isLoading={isLoading} hasData={hasData} animateKey={animKey}
           compareDriver={compareDriver} compareSpeedSeries={compareSpeedSeries}
+          driver={driver} lapDelta={lapDelta} lapDeltaLoading={lapDeltaLoading}
         />
 
         <MissionFooter tel={tel} strat={strat} hasData={hasData} execution={result?.execution} />

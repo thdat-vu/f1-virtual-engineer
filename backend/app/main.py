@@ -20,6 +20,7 @@ from app.schemas.saved_queries import (
     SavedQueryListResponse,
 )
 from app.schemas.knowledge import KnowledgeLookupRequest, KnowledgeLookupResponse
+from app.schemas.lap_delta import LapDeltaRequest, LapDeltaResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from app.schemas.tyre import TyreAnalyzeRequest, TyreAnalyzeResponse
@@ -47,6 +48,7 @@ from tools.fastf1_helper import (
     load_prebaked_into_caches,
 )
 from tools.knowledge_retriever import lookup as knowledge_lookup
+from tools.lap_delta import compute_lap_delta
 from tools.tyre_helper import compute_tyre_decay
 
 
@@ -654,6 +656,37 @@ async def analyze_tyre(
     return TyreAnalyzeResponse(
         status="error" if snapshot.get("fallback") else "success",
         **snapshot,
+    )
+
+
+@app.post(
+    "/lap-delta",
+    response_model=LapDeltaResponse,
+    tags=["telemetry"],
+    summary="Per-distance Δt between two drivers' fastest (or pinned) laps",
+    description=(
+        "Aligns each driver's lap telemetry on Distance and returns the "
+        "compare driver's time delta to the reference driver, sampled at "
+        "250 points along the lap. Positive values mean compare was behind. "
+        "Fail-closed: any FastF1 hiccup degrades to a populated envelope "
+        "with `fallback: true` instead of 5xx."
+    ),
+)
+@limiter.limit("30/10seconds")
+async def lap_delta(request: Request, body: LapDeltaRequest):
+    payload = await asyncio.to_thread(
+        compute_lap_delta,
+        year=body.year,
+        event=body.event,
+        session_type=body.session_type,
+        reference_driver=body.reference_driver,
+        compare_driver=body.compare_driver,
+        reference_lap=body.reference_lap,
+        compare_lap=body.compare_lap,
+    )
+    return LapDeltaResponse(
+        status="error" if payload.get("fallback") else "success",
+        **payload,
     )
 
 

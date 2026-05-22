@@ -1,11 +1,13 @@
 "use client";
 
-import type { AnalyzeResponse } from "@/services/api";
+import type { AnalyzeResponse, LapDeltaResponse } from "@/services/api";
+import { LapDeltaChart } from "./LapDeltaChart";
 import { TelemetryChart } from "./TelemetryChart";
 import { TimeAxis } from "./TimeAxis";
 
 export function TelemetryChartGrid({
   tel, isLoading, hasData, animateKey, compareDriver, compareSpeedSeries,
+  driver, lapDelta, lapDeltaLoading,
 }: {
   tel: AnalyzeResponse["telemetry_data"] | undefined;
   isLoading: boolean;
@@ -13,6 +15,9 @@ export function TelemetryChartGrid({
   animateKey: number;
   compareDriver: string;
   compareSpeedSeries: number[] | null;
+  driver: string;
+  lapDelta: LapDeltaResponse | null;
+  lapDeltaLoading: boolean;
 }) {
   const lapDurationS = tel?.lap_duration_s ?? null;
   const sectorBoundariesS = tel?.sector_boundaries_s ?? [];
@@ -60,6 +65,24 @@ export function TelemetryChartGrid({
           </div>
         );
       })}
+
+      {compareDriver ? (
+        <div className="mt-3 min-h-0 flex-1">
+          <LapDeltaChart
+            distances={lapDelta?.distance_m ?? []}
+            deltas={lapDelta?.delta_seconds ?? []}
+            referenceDriver={driver}
+            compareDriver={compareDriver}
+            isLoading={lapDeltaLoading}
+            hasData={Boolean(
+              lapDelta && !lapDelta.fallback && (lapDelta.delta_seconds?.length ?? 0) > 1,
+            )}
+            animateKey={animateKey}
+            fallback={Boolean(lapDelta?.fallback)}
+            fallbackReason={lapDelta?.fallback_reason ?? null}
+          />
+        </div>
+      ) : null}
 
       <TimeAxis
         lapDurationS={hasData ? lapDurationS : null}

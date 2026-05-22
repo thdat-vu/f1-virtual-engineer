@@ -640,3 +640,46 @@ export async function analyzeTyre(
   }
   return (await response.json()) as TyreAnalyzeResponse;
 }
+
+// ─── Lap Delta (#184) ─────────────────────────────────────────────────
+// Per-distance Δt between two drivers' fastest laps. Positive values
+// mean compare_driver was behind at that point on the lap. Same fail-
+// closed envelope shape as the rest: fallback=true with a reason and
+// empty arrays when telemetry is unavailable for either driver.
+
+export interface LapDeltaRequest {
+  year: number;
+  event: string;
+  session_type: string;
+  reference_driver: string;
+  compare_driver: string;
+  reference_lap?: number | null;
+  compare_lap?: number | null;
+}
+
+export interface LapDeltaResponse {
+  status: "success" | "error";
+  distance_m: number[];
+  delta_seconds: number[];
+  reference_driver: string | null;
+  compare_driver: string | null;
+  reference_lap: number | null;
+  compare_lap: number | null;
+  fallback: boolean;
+  fallback_reason?: string | null;
+}
+
+export async function getLapDelta(
+  payload: LapDeltaRequest,
+): Promise<LapDeltaResponse> {
+  const response = await fetch(`${apiBaseUrl}/lap-delta`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 429) throw await readRateLimit(response);
+  if (!response.ok) {
+    throw new Error(`Lap delta request failed with status ${response.status}`);
+  }
+  return (await response.json()) as LapDeltaResponse;
+}
