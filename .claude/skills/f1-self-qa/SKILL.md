@@ -13,7 +13,7 @@ Run the repo guardrail script first, then review the five dimensions below. Do n
 ./.codex/scripts/self-qa.sh --staged
 ```
 
-This runs `pytest backend/tests` and `cd frontend && npm run lint && npm run build` only for the surfaces your staged files actually touch. If it fails, fix the root cause — never skip with `--no-verify`.
+This runs `pytest backend/tests` and `cd frontend && yarn lint && yarn build` only for the surfaces your staged files actually touch. If it fails, fix the root cause — never skip with `--no-verify`.
 
 ## 1. Data integrity
 

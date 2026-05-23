@@ -29,6 +29,6 @@ Applies to files in `frontend/`.
 
 Before considering a frontend task done:
 
-1. `npm run lint` passes.
+1. `yarn lint` passes.
 2. Main route renders with no runtime errors.
 3. At least one interaction path is tested manually (driver select, strategy panel update, or equivalent).

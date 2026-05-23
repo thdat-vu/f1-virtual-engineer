@@ -83,14 +83,14 @@ python3 -m pytest backend/tests
 ### Frontend
 
 ```bash
-cd frontend && npm run lint
+cd frontend && yarn lint
 ```
 
 ### Full slice
 
 ```bash
 python3 -m pytest backend/tests
-cd frontend && npm run lint
+cd frontend && yarn lint
 ```
 
 ### Repo guardrails

@@ -1,19 +1,21 @@
 # ──────────────────────────────────────────────────────────────
-# Stage 1 — deps: clean install with the lockfile-free package.json.
-#                 npm ci would be ideal but the repo doesn't track
-#                 package-lock.json (see .gitignore), so npm install
-#                 is the honest choice.
+# Stage 1 — deps: corepack pins yarn from package.json's
+#                 packageManager field, so dev/CI/Docker all run
+#                 the exact same Yarn 4. --immutable enforces the
+#                 committed yarn.lock — no resolution drift.
 # ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY frontend/package.json ./package.json
-RUN npm install --no-audit --no-fund --prefer-offline
+RUN corepack enable
+COPY frontend/package.json frontend/yarn.lock frontend/.yarnrc.yml ./
+RUN yarn install --immutable
 
 # ──────────────────────────────────────────────────────────────
 # Stage 2 — builder: compile Next with standalone output.
 # ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
+RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend .
 ARG NEXT_PUBLIC_API_BASE_URL=/api
@@ -31,7 +33,7 @@ ENV BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN yarn build
 
 # ──────────────────────────────────────────────────────────────
 # Stage 3 — runtime: ships only Next's standalone bundle (server +

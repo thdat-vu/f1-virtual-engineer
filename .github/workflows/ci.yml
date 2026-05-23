@@ -41,19 +41,22 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: yarn install --immutable
 
       - name: Lint frontend
         working-directory: frontend
-        run: npm run lint
+        run: yarn lint
 
       - name: Build frontend
         working-directory: frontend
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-        run: npm run build
+        run: yarn build
 
   docker-builds:
     runs-on: ubuntu-latest

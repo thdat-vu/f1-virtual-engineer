@@ -37,8 +37,8 @@ The project is structured to separate AI reasoning (Backend) from visualization 
    - Install dependencies: `pip install -r backend/requirements.txt`.
    - Run server: `python backend/app/main.py`.
 2. **Frontend**:
-   - Install dependencies: `npm install`.
-   - Run dev: `npm run dev` (Port 3001).
+   - Install dependencies: `corepack enable && yarn install --immutable`.
+   - Run dev: `yarn dev` (Port 3001).
 
 ## Evaluation Standards
 - All tool calls must use Pydantic schemas.

@@ -113,7 +113,7 @@ Core checks:
 
 ```bash
 python3 -m pytest backend/tests
-cd frontend && npm run lint
+cd frontend && yarn lint
 ```
 
 Also confirm:

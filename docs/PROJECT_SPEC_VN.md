@@ -37,8 +37,8 @@ Dự án được cấu trúc để tách biệt phần tư duy AI (Backend) và
    - Cài đặt thư viện: `pip install -r backend/requirements.txt`.
    - Chạy server: `python backend/app/main.py`.
 2. **Frontend**:
-   - Cài đặt thư viện: `npm install`.
-   - Chạy dev: `npm run dev` (Port 3001).
+   - Cài đặt thư viện: `corepack enable && yarn install --immutable`.
+   - Chạy dev: `yarn dev` (Port 3001).
 
 ## Tiêu chuẩn Đánh giá
 - Mọi lời gọi công cụ (tool calls) phải sử dụng Pydantic schema.

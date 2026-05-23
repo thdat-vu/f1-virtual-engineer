@@ -139,7 +139,7 @@ make dev
 
 That runs `scripts/dev.sh`, which:
 - creates `.venv` + installs `backend/requirements.txt` if needed,
-- runs `npm install` in `frontend/` if `node_modules/` is missing,
+- runs `yarn install --immutable` in `frontend/` if `node_modules/` is missing (corepack pins yarn from `package.json#packageManager`),
 - pre-flights ports 3000 + 8000 (a stale `next-server` or `uvicorn` from a previous session prints its PID + a ready-to-paste `kill` command instead of failing mid-startup),
 - starts both processes and tears them down together on Ctrl-C.
 
@@ -222,7 +222,7 @@ To enable real sign-in:
 3. Add allowed redirect URLs in the Supabase auth settings:
    - `http://localhost:3000/auth/callback` (local dev)
    - your staging / production callback once that domain exists.
-4. Restart `npm run dev`. The Mission Control header now shows "Sign in with Google"; signed-in users see their email + a "Sign out" button. The session is cookie-based and survives a refresh.
+4. Restart `yarn dev`. The Mission Control header now shows "Sign in with Google"; signed-in users see their email + a "Sign out" button. The session is cookie-based and survives a refresh.
 
 Signed-in users get `/analyze`, `/telemetry`, and radio history persisted server-side (Supabase Postgres + RLS), plus a Star button to save curated queries (driver, session, optional `vs <driver>` comparison). All four panels — Recent, Recently viewed, Radio log, Saved — live in the Mission Control right rail and replay the full analysis on click via the existing L1 + L2 cache.
 

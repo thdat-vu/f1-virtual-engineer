@@ -12,7 +12,7 @@ The cheapest mistake to fix is the one you catch before claiming "done". This sk
 Repeat until every step passes:
 
 1. **Run** `./.codex/scripts/self-qa.sh --staged`. If it fails, do not interpret — read the actual error message and fix the root cause.
-2. **Re-run** the failing step alone (`pytest backend/tests/test_x.py::test_y`, `npm run lint -- --max-warnings 0`) to confirm the fix is real.
+2. **Re-run** the failing step alone (`pytest backend/tests/test_x.py::test_y`, `yarn lint --max-warnings 0`) to confirm the fix is real.
 3. **Manual demo** — for any user-visible change, exercise the feature in the browser or hit the API. Type-checks and tests verify *correctness*, not *feature behavior*. If you can't demo it, say so out loud.
 4. **Re-stage** anything you fixed (`git add -p` over `git add .` for surgical control).
 5. **Repeat from step 1** until the loop is green.
