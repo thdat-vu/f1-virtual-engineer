@@ -66,6 +66,17 @@ stack-up:
 		echo "  generate one: openssl rand -base64 32 | tr -d '=+/' | cut -c1-32"; \
 		exit 1; \
 	}
+	@grep -q '^NEXT_PUBLIC_SUPABASE_URL=..' backend/.env || { \
+		echo "✗ NEXT_PUBLIC_SUPABASE_URL not set in backend/.env."; \
+		echo "  Build-time inline for next.js — without it the prod bundle"; \
+		echo "  ships supabase auth disabled. Copy from your supabase project."; \
+		exit 1; \
+	}
+	@grep -q '^NEXT_PUBLIC_SUPABASE_ANON_KEY=..' backend/.env || { \
+		echo "✗ NEXT_PUBLIC_SUPABASE_ANON_KEY not set in backend/.env."; \
+		echo "  Build-time inline for next.js — same as URL above."; \
+		exit 1; \
+	}
 	$(COMPOSE) up -d --build
 	@echo "✓ stack starting; run 'make stack-status' to watch health."
 

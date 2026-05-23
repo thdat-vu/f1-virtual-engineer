@@ -217,6 +217,16 @@ services:
       args:
         BACKEND_INTERNAL_URL: http://backend:8000
         NEXT_PUBLIC_API_BASE_URL: /api
+        # NEXT_PUBLIC_* are inlined into the client JS bundle by
+        # `next build`; if they're not passed as build args here, the
+        # browser bundle ships without them and supabase auth silently
+        # disables in prod (the AuthButton renders "Sign in
+        # unavailable"). env_file below is runtime-only — too late.
+        # Compose pulls these from the shell or --env-file at
+        # `docker compose build` time; supply them in the same env that
+        # already provides REDIS_PASSWORD etc.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL must be set at build time}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?NEXT_PUBLIC_SUPABASE_ANON_KEY must be set at build time}
     env_file:
       - frontend/.env.local
     environment:

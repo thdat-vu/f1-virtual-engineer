@@ -18,8 +18,18 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY frontend .
 ARG NEXT_PUBLIC_API_BASE_URL=/api
 ARG BACKEND_INTERNAL_URL=http://backend:8000
+# NEXT_PUBLIC_* must be present at `next build` time — Next inlines
+# them into the client JS bundle here, not at runtime. Mounting them
+# only via env_file on the runtime container is too late: the bundle
+# is already shipped, the values aren't in it, and the auth flow
+# silently disables itself in prod. No defaults — empty values would
+# build a broken bundle without complaining.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
+ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
