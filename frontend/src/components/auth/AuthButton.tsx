@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSupabase } from "./SupabaseProvider";
+import { getSupabaseEnv } from "@/lib/supabase/client";
 
 const buttonClass =
   "shrink-0 rounded-sm border border-border-strong px-2 py-0.5 text-[length:var(--text-readout)] uppercase tracking-wide text-foreground-dim transition-colors duration-[var(--dur-fast)] hover:text-foreground hover:border-foreground disabled:opacity-40 disabled:cursor-not-allowed";
@@ -10,15 +11,34 @@ export function AuthButton() {
   const { supabase, session, configured } = useSupabase();
   const [busy, setBusy] = useState(false);
 
+  // Debug aid (#auth-prod-unavailable): NEXT_PUBLIC_* are inlined at
+  // `next build` time, not runtime. If prod build doesn't see them,
+  // configured falls to false and the button disables before we ever
+  // hit Google. Surface a one-shot log so devops can confirm the
+  // build-time injection without us leaking the actual values.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const env = getSupabaseEnv();
+    console.log("[auth-debug] supabase env present:", {
+      NEXT_PUBLIC_SUPABASE_URL: Boolean(env.url),
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: Boolean(env.anonKey),
+      configured: env.configured,
+      origin: window.location.origin,
+    });
+  }, []);
+
   if (!configured) {
+    const env = getSupabaseEnv();
+    const urlOk = Boolean(env.url);
+    const keyOk = Boolean(env.anonKey);
     return (
       <button
         type="button"
         className={buttonClass}
         disabled
-        title="Supabase env vars not configured"
+        title={`Build-time env missing — URL: ${urlOk ? "ok" : "MISSING"}, KEY: ${keyOk ? "ok" : "MISSING"}. NEXT_PUBLIC_* must be set at \`next build\` time, not just at runtime.`}
       >
-        Sign in unavailable
+        Sign in unavailable · URL {urlOk ? "✓" : "✗"} KEY {keyOk ? "✓" : "✗"}
       </button>
     );
   }
