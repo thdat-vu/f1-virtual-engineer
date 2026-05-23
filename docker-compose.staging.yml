@@ -232,6 +232,22 @@ services:
     environment:
       BACKEND_INTERNAL_URL: http://backend:8000
       NEXT_PUBLIC_API_BASE_URL: /api
+      # The same NEXT_PUBLIC_SUPABASE_* values are ALSO required at
+      # runtime — `app/auth/callback/route.ts` runs server-side and
+      # calls supabase.auth.exchangeCodeForSession, which reads from
+      # process.env. Build-time inlining handles the browser bundle;
+      # this block handles the route handler. If only one is set, prod
+      # symptom is the Google login completing then redirecting back
+      # with `?auth_error=fetch+failed`.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL must be set at runtime too}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?NEXT_PUBLIC_SUPABASE_ANON_KEY must be set at runtime too}
+      # Canonical origin for the auth callback redirect. Without this,
+      # if the reverse proxy doesn't forward X-Forwarded-Host, Next
+      # falls back to the listen address (0.0.0.0:3000) and bounces
+      # the user to https://0.0.0.0:3000 post-login. Defaults blank
+      # which preserves the legacy behaviour for environments where
+      # the proxy already passes Host correctly.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
     depends_on:
       - backend
     ports:
