@@ -1,9 +1,10 @@
 # F1 Virtual Engineer
 
 [![CI](https://github.com/thdat-vu/f1-virtual-engineer/actions/workflows/ci.yml/badge.svg)](https://github.com/thdat-vu/f1-virtual-engineer/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)
+![Yarn](https://img.shields.io/badge/Yarn-4-2C8EBB?logo=yarn&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -46,10 +47,12 @@ To ensure maintainability and scalability, this project uses a monorepo structur
 * **Language:** Python 3.11+ (Backend) & TypeScript (Frontend)
 * **AI Orchestration:** LangGraph, LangChain
 * **API Framework:** FastAPI, Pydantic
-* **Telemetry Data:** FastF1
-* **Vector Database:** Supabase / PostgreSQL
+* **Telemetry Data:** FastF1 (numpy-aligned distance grids for lap-vs-lap Δt)
+* **Frontend:** Next.js 16 (App Router, Turbopack), framer-motion, Yarn 4 (corepack-pinned, immutable installs)
+* **Auth + Persistence:** Supabase Auth (Google OAuth, asymmetric JWT/JWKS), Supabase Postgres with row-level security
 * **Caching:** `cachetools` TTLCache (L1, in-process) + optional Redis (L2, shared across workers)
-* **Deployment:** Docker, Docker Compose
+* **Async pipeline:** Celery + RabbitMQ (opt-in async LLM rationale path with bounded retries + dead-letter queue)
+* **Deployment:** Docker, Docker Compose (staging stack hardened — no host port mapping for Redis/RabbitMQ, renamed `CONFIG`/`FLUSHALL`, `requirepass` enforced)
 
 ---
 
@@ -60,10 +63,11 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | Capability | Status | Endpoint |
 | --- | --- | --- |
 | `get_telemetry` — speed/gear/RPM/throttle/brake summaries with fallback metadata | ✅ Shipped | `GET /telemetry`, `GET /laps/{...}` |
-| `strategy_analyzer` — pit-window recommendations with undercut/overcut risk, confidence band, real FastF1 gap to a chosen rival, per-track pit-loss table, undercut break-even laps, and expected-gain projection over a 3-lap rival reaction window (#168) | ✅ Shipped | `POST /analyze` (strategy intent) |
+| `strategy_analyzer` — pit-window recommendations with undercut/overcut risk, confidence band, real FastF1 gap to a chosen rival, per-track pit-loss table, undercut break-even laps, and expected-gain projection over a 3-lap rival reaction window (#168) | ✅ Shipped | `POST /analyze` (strategy intent — explicit `Telemetry / Strategy` toggle in Mission Control) |
+| `lap_delta` — per-distance Δt(reference vs compare) computed by aligning two drivers' fastest-lap telemetry on a shared distance grid (`numpy.interp`), so the chart shows *where* on the lap the gap actually accrues, not just the final number | ✅ Shipped | `POST /lap-delta` |
 | `race_engineer_rationale` — Gemini Flash-generated natural-language summary, with deterministic template fallback when the LLM is unavailable. Optional async path (`RATIONALE_ASYNC=true`) returns the template instantly and back-fills the LLM rationale onto the persisted history row via a Celery worker — the frontend swaps the text in once it lands. | ✅ Shipped | `POST /analyze` (`rationale_source: "llm" \| "template"`, `analyze_history_id`, `rationale_job_id`) |
 | `radio_interpreter` — closed-set classification of team-radio transcripts (tyre/brake/engine/traffic/weather/strategy/none) with severity + trigger phrase | ✅ Shipped | `POST /radio/analyze` |
-| `predict_tyre_wear` — standalone tyre-degradation snapshot with compound, stint length, observed decay (s/lap), and projected cliff-lap | ✅ Shipped | `POST /tyre/analyze` |
+| `predict_tyre_wear` — standalone tyre-degradation snapshot with compound, stint length, observed decay (s/lap), projected cliff-lap, and an `as of L<n>` context line so the headline can't be misread as a real-time call about the lap currently on screen | ✅ Shipped | `POST /tyre/analyze` |
 | `knowledge_retriever` — RAG over FIA regulations + historical incidents | ⏳ Planned | tracked in `#25`, `#26` |
 | Google sign-in (Supabase Auth foundation) | ✅ Shipped | `/auth/callback` (frontend) |
 | Per-user `/analyze` history — opt-in persistence by session, list endpoint, Mission Control "Recent" panel. Clicking a row replays the analysis so the chart panels populate immediately (cache-warm hit ≈50ms). | ✅ Shipped | `POST /analyze` (writes when JWT present), `GET /analyze/history` |
@@ -80,6 +84,21 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 * **Optional Redis L2 cache** — set `REDIS_URL` (e.g. `redis://localhost:6379/0`) and the FastF1 helpers gain a second tier: L1 in-process → L2 Redis → compute. Multi-worker / multi-pod deployments share the same warmed-up state instead of each process refilling its own cache. A Redis outage degrades silently to "L1 only" — the API never 5xxs because of cache infrastructure. Inspect `GET /metrics` → `cache.redis_enabled` to confirm the wiring.
 * **Async LLM rationale (opt-in)** — flip `RATIONALE_ASYNC=true` and signed-in callers get an instant template response while a Celery worker back-fills the Gemini rationale onto the persisted `analyze_history` row. Retries are bounded (3× with exponential backoff); terminal failures land in a dead-letter queue and bump `workers.failed_24h`. The frontend polls `/analyze/history` for the row and swaps in the upgraded text — no SSE/WebSocket required. Anonymous callers always take the synchronous path so they never see a degraded "template-only" response.
 * **Admin observability** — `/admin` is gated behind `NEXT_PUBLIC_ADMIN_USER_ID` and renders rolling p50/p95/max latency + error rate per route. Two worker card grids: **last 24h** (`completed_24h`, `failed_24h`, Redis backend status, scraped from Redis counters bumped by the worker on success/failure) and **live** (`queue_depth`, `in_flight`, `dlq_size`, scraped from the RabbitMQ Management API every 5s). Either source unreachable degrades to zeros plus a status flag — `/metrics` itself never 5xxs.
+
+### Engineering decisions worth calling out
+
+A few non-obvious choices a reviewer might want context on. Each is a deliberate trade-off, not a default.
+
+* **Fail-closed envelope contract on every helper.** `predict_tyre_wear`, `compute_lap_delta`, `strategy_analyzer`, `get_telemetry`, etc. all return populated `{..., fallback: True, fallback_reason: "..."}` instead of raising on FastF1 hiccups. Cost: every endpoint has to special-case nothing on the client. Benefit: the API never 5xxs because of a sparse practice session, and the UI can render an honest "data unavailable" state with the actual reason — no spinner-of-death.
+* **`numpy.interp` for lap-vs-lap Δt instead of `fastf1.utils.delta_time`.** The library's helper is deprecated and known-inaccurate; we align both drivers' telemetry on a shared distance grid ourselves and rebase `SessionTime` to zero per-lap so the trace shows *gap accumulation along the lap*, not session-clock drift.
+* **Build-time `NEXT_PUBLIC_*` injection, codified in compose.** Next inlines public env vars at `next build` time, not runtime. After hitting a prod-only "Sign in unavailable" failure that looked like an OAuth misconfig, we made compose fail-parse with `${VAR:?msg}` if any are missing, added a Makefile pre-flight grep, and put a `URL ✗ KEY ✗` diagnostic pill in the AuthButton so the next failure of this class is self-explaining.
+* **Yarn 4 with `nodeLinker: node-modules`, not PnP.** Berry's PnP would shrink installs further but breaks Next 16 + Turbopack today. We picked the deterministic-install win and skipped the resolution-graph win — revisit when we move off Turbopack.
+* **Async LLM rationale is opt-in, anonymous callers stay sync.** `RATIONALE_ASYNC=true` only kicks in for signed-in users — anonymous callers always get the synchronous path, never a degraded "template only" UX while waiting for a worker. Bounded retries (3× exponential backoff) + dead-letter queue + 24h success/failure counters surfaced on `/admin`.
+* **Hardened staging compose by default.** Redis with `requirepass` + renamed `CONFIG`/`FLUSHALL`/`FLUSHDB`, no host port mapping for Redis or RabbitMQ, `maxmemory + allkeys-lru` so a runaway cache key can't OOM-kill the VPS. Notes on each guardrail live inline in `docker-compose.staging.yml` so the reasoning survives the next refactor.
+
+### Workflow loop
+
+Every change in this repo goes through the same loop: GitHub issue → thin slice (one backend capability + one visible surface + one focused test) → conventional commit (`feat(backend): ...` / `fix(frontend): ...`) → PR against `develop` with **Summary / Why / What changed / Verification / Risks** sections. The CI job runs backend pytest, frontend `yarn lint`/`yarn build`, and `docker build` for both images on every PR. This is documented in `CLAUDE.md` and the `.claude/skills/` set, and is the reason recent merge history looks tight (4 PRs in one session for #182→#185 plus the auth-prod fix is normal cadence, not a sprint).
 
 ### Pre-baking the FastF1 cache
 
