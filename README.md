@@ -134,6 +134,17 @@ RUN_LLM_EVAL=1 python3 -m pytest tests/test_eval_rationale.py -v
 
 Each fixture asserts that every `expected_substrings` entry appears in the generated text and no `forbidden_substrings` entry leaks through. Add a new case by appending to the fixtures file — the harness picks it up via parametrize, no harness change needed. Run before merging any prompt change in `core/llm.py`.
 
+### Strategy pit-accuracy eval
+
+`backend/evals/cases/strategy_pit_fixtures.py` lists historical race-driver pairings whose first-stop lap the heuristic should bracket. The harness derives ground truth from FastF1 lap data at runtime (no hardcoded lap numbers), runs `strategy_analyzer` per fixture, and prints the pass rate against a ±2-lap tolerance band. Opt-in via `RUN_STRATEGY_PIT_EVAL=1`:
+
+```bash
+cd backend
+RUN_STRATEGY_PIT_EVAL=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
+```
+
+The `-s` flag matters — the summary line goes to stdout. Use this whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
+
 ---
 
 ## Getting Started
