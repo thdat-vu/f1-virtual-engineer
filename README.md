@@ -10,6 +10,18 @@
 
 An end-to-end agentic AI system that acts as a virtual Formula 1 race engineer. It processes telemetry, retrieves historical race data, and produces strategy recommendations — pit-stop timing (undercut/overcut), tire-degradation analysis, explainable race calls.
 
+## ▶︎ Try it live
+
+**Mission Control runs in your browser at <https://f1-virtual-engineer.duckdns.org/mission-control>.** Anonymous works — no sign-in needed for the core flow. Optional Google sign-in unlocks per-user history + saved queries (Supabase Auth + RLS).
+
+Suggested first run:
+
+1. Pick **2024 → Japanese Grand Prix → R → VER** in the selectors and click **Analyze** — get a full telemetry summary plus a baseline strategy call with pit window, undercut risk, and an LLM rationale.
+2. Set the **vs driver** to **HAM** — the lap-delta chart appears showing where on the lap the gap actually accrues.
+3. Switch the intent toggle to **Strategy** and re-analyze — the **Compare strategies** panel opens with two side-by-side what-if scenarios, each with cited rationale (click a citation chip to read the full corpus note).
+
+Cold-start latency on first FastF1 fetch is ~5-30s; subsequent calls hit the L1+L2 cache and return in ~50ms. The `/admin` page exposes per-route p50/p95 and worker queue depth (gated behind a single Supabase user id, so it's a no-op for the public).
+
 ---
 
 ## System Architecture
@@ -64,6 +76,7 @@ The Virtual Engineer is equipped with strict tool-use policies and capabilities.
 | --- | --- | --- |
 | `get_telemetry` — speed/gear/RPM/throttle/brake summaries with fallback metadata | ✅ Shipped | `GET /telemetry`, `GET /laps/{...}` |
 | `strategy_analyzer` — pit-window recommendations with undercut/overcut risk, confidence band, real FastF1 gap to a chosen rival, per-track pit-loss table, undercut break-even laps, and expected-gain projection over a 3-lap rival reaction window (#168) | ✅ Shipped | `POST /analyze` (strategy intent — explicit `Telemetry / Strategy` toggle in Mission Control) |
+| `strategy_analyzer` what-if comparison — side-by-side scenario cards (1-3 slots) so a user can compare "Undercut now vs Hold +3 laps" or "Aggressive vs Steady" and see expected gain + cited rationale per slot. Per-scenario fail-closed: a helper hiccup on one slot doesn't take down the others. | ✅ Shipped | `POST /strategy/compare`; toggle in Mission Control's Strategy HUD |
 | `lap_delta` — per-distance Δt(reference vs compare) computed by aligning two drivers' fastest-lap telemetry on a shared distance grid (`numpy.interp`), so the chart shows *where* on the lap the gap actually accrues, not just the final number | ✅ Shipped | `POST /lap-delta` |
 | `race_engineer_rationale` — Gemini Flash-generated natural-language summary, with deterministic template fallback when the LLM is unavailable. Optional async path (`RATIONALE_ASYNC=true`) returns the template instantly and back-fills the LLM rationale onto the persisted history row via a Celery worker — the frontend swaps the text in once it lands. | ✅ Shipped | `POST /analyze` (`rationale_source: "llm" \| "template"`, `analyze_history_id`, `rationale_job_id`) |
 | `radio_interpreter` — closed-set classification of team-radio transcripts (tyre/brake/engine/traffic/weather/strategy/none) with severity + trigger phrase | ✅ Shipped | `POST /radio/analyze` |
