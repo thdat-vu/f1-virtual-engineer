@@ -70,11 +70,29 @@ def predict_tyre_wear(
         ]
 
     if degradation_rate < 0.2:
-        drop_window = [12, 18]
+        # Low degradation: 1-stop or save-tyres 2-stop. Real first stops
+        # land around 30-50% into total race distance — middle third.
+        window_fractions = (0.30, 0.50)
     elif degradation_rate < 0.4:
-        drop_window = [8, 14]
+        # Medium degradation: standard 2-stop pacing — pit in the
+        # early-middle.
+        window_fractions = (0.20, 0.35)
     else:
-        drop_window = [4, 10]
+        # High degradation: forced early stop — first 10-20% of the race.
+        window_fractions = (0.10, 0.20)
+
+    # Scale fractions by the driver's actual lap_count so a 66-lap race
+    # (Spain) and a 52-lap race (Britain) don't get the same window.
+    # Falls back to the legacy ~55-lap baseline if lap_count is missing
+    # — keeps existing fixtures and golden tests intact.
+    lap_count_raw = features.get("lap_count")
+    lap_count = int(lap_count_raw) if lap_count_raw else 55
+    drop_window = [
+        max(round(window_fractions[0] * lap_count), 4),
+        max(round(window_fractions[1] * lap_count), 8),
+    ]
+    if drop_window[1] <= drop_window[0]:
+        drop_window[1] = drop_window[0] + 4
 
     return {
         "driver": driver.upper(),

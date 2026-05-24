@@ -32,6 +32,43 @@ class StrategyHelperTests(unittest.TestCase):
         self.assertEqual(len(result["prediction"]["expected_performance_drop_window_laps"]), 2)
 
     @patch("tools.strategy_helper.extract_tyre_wear_features")
+    def test_predict_tyre_wear_window_scales_with_lap_count(self, mock_extract):
+        # Regression guard for #210: pre-fix the helper returned [12, 18]
+        # for every low-degradation race regardless of lap_count, so a
+        # 66-lap Spanish GP and a 53-lap Italian GP got identical windows.
+        def _features(lap_count: int) -> dict:
+            return {
+                "driver": "HAM",
+                "year": 2024,
+                "event": "Synthetic",
+                "session_type": "R",
+                "fallback": False,
+                "fallback_reason": None,
+                "features": {
+                    "lap_count": lap_count,
+                    "stint_count": 2,
+                    "lap_time_decay_seconds_per_lap": 0.0,
+                    "stint_progress_ratio": 0.5,
+                    "avg_track_temp_c": 30.0,
+                    "track_temp_trend_c_per_lap": 0.0,
+                    "temperature_missing": False,
+                },
+            }
+
+        mock_extract.return_value = _features(53)
+        short = predict_tyre_wear(2024, "Synthetic", "R", "HAM")["prediction"][
+            "expected_performance_drop_window_laps"
+        ]
+        mock_extract.return_value = _features(66)
+        long_race = predict_tyre_wear(2024, "Synthetic", "R", "HAM")["prediction"][
+            "expected_performance_drop_window_laps"
+        ]
+
+        self.assertNotEqual(short, long_race)
+        self.assertGreater(long_race[0], short[0])
+        self.assertGreater(long_race[1], short[1])
+
+    @patch("tools.strategy_helper.extract_tyre_wear_features")
     def test_predict_tyre_wear_handles_fallback(self, mock_extract):
         mock_extract.return_value = {
             "driver": "HAM",

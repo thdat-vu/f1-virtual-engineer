@@ -145,17 +145,17 @@ RUN_STRATEGY_PIT_EVAL=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
 
 The `-s` flag matters — the summary line goes to stdout. Use this whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
 
-**Latest run (2026-05-24, 5 fixtures, ±2 laps tolerance):** 2/5 passed (40%).
+**Latest run (2026-05-24, 5 fixtures, ±2 laps tolerance):** 4/5 passed (80%) — up from 2/5 after #210.
 
 ```
-[FAIL] 2024-japan-r-ver:    recommended 12-18, actual 1   (lap-1 SC incident, not a strategy call)
-[PASS] 2024-italy-r-lec:    recommended 12-18, actual 15
-[PASS] 2023-japan-r-ver:    recommended 12-18, actual 16
-[FAIL] 2024-spain-r-nor:    recommended 12-18, actual 23
-[FAIL] 2024-britain-r-ham:  recommended 12-18, actual 27
+[FAIL] 2024-japan-r-ver:    recommended 16-26, actual 1   (lap-1 SC incident, not a strategy call)
+[PASS] 2024-italy-r-lec:    recommended 16-26, actual 15
+[PASS] 2023-japan-r-ver:    recommended 16-26, actual 16
+[PASS] 2024-spain-r-nor:    recommended 20-33, actual 23
+[PASS] 2024-britain-r-ham:  recommended 16-26, actual 27
 ```
 
-What the eval surfaced — and why it's the point of having it: the current heuristic returns the same `12-18` window for every fixture across four different circuits. That's a real signal, not a calibration issue, and is why a numerical accuracy harness matters more than another regression-drift baseline. Tracked as a follow-up so the next change to `predict_tyre_wear` / `strategy_analyzer` has a yardstick to beat.
+The first run (40%) surfaced that `predict_tyre_wear` returned the same `12-18` window for every fixture across four circuits — a real heuristic limitation, not a measurement noise issue. Tracked as [#210](https://github.com/thdat-vu/f1-virtual-engineer/issues/210); the smallest defensible fix was scaling the drop window proportionally to `lap_count` rather than treating it as a constant. Spain (66 laps) now gets `20-33`, the 53-lap circuits get `16-26`, and four of five fixtures bracket their actual first stop. The remaining FAIL is a lap-1 safety-car incident — outside the scope of any tyre-wear heuristic.
 
 ---
 
