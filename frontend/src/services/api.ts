@@ -721,3 +721,58 @@ export async function getKnowledgeNote(
     return null;
   }
 }
+
+// Strategy what-if comparison (#202 / #203). Mirrors the backend
+// scenario orchestrator: 1-3 specs in, one outcome per slot out, with
+// per-slot fail-closed envelopes.
+
+export interface ScenarioSpec {
+  label: string;
+  gap_override_seconds?: number | null;
+  target_driver?: string | null;
+}
+
+export interface ScenarioOutcome {
+  label: string;
+  recommended_pit_window_laps: number[];
+  confidence_band: string;
+  undercut_risk: string;
+  overcut_risk: string;
+  expected_gain_seconds: number | null;
+  undercut_break_even_laps: number | null;
+  current_gap_seconds: number | null;
+  gap_source: "fastf1" | "fallback" | "explicit" | null;
+  citations: KnowledgeCitation[];
+  fallback: boolean;
+  fallback_reason?: string | null;
+}
+
+export interface StrategyCompareRequest {
+  year: number;
+  event: string;
+  session_type: string;
+  driver: string;
+  target_driver?: string | null;
+  scenarios: ScenarioSpec[];
+}
+
+export interface StrategyCompareResponse {
+  status: "success" | "error";
+  scenarios: ScenarioOutcome[];
+  error?: string | null;
+}
+
+export async function compareStrategies(
+  payload: StrategyCompareRequest,
+): Promise<StrategyCompareResponse> {
+  const response = await fetch(`${apiBaseUrl}/strategy/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 429) throw await readRateLimit(response);
+  if (!response.ok) {
+    throw new Error(`Strategy compare request failed with status ${response.status}`);
+  }
+  return (await response.json()) as StrategyCompareResponse;
+}

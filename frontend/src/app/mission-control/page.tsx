@@ -379,6 +379,7 @@ export default function MissionControlPage() {
         session={session} theme={theme} rateLimitMessage={rateLimitMessage}
         retryState={retryState} onRetryClick={handleAnalyze}
         year={year} eventName={eventName} driver={driver}
+        targetDriver={compareDriver}
         historyRefreshSignal={historyRefreshSignal}
         onSelectHistory={handleSelectHistory}
         telemetryHistoryRefreshSignal={telemetryHistoryRefreshSignal}

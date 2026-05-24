@@ -10,6 +10,7 @@ import { RecentTelemetry } from "./RecentTelemetry";
 import { RadioLog } from "./RadioLog";
 import { ReferencesPanel } from "./ReferencesPanel";
 import { SavedQueriesPanel } from "./SavedQueriesPanel";
+import { ScenarioComparison } from "./ScenarioComparison";
 import { TyreCard } from "./TyreCard";
 import { WhyThisCallPanel } from "./WhyThisCallPanel";
 import { TEAMS, type SessionId, type TeamId } from "./constants";
@@ -17,7 +18,7 @@ import { TEAMS, type SessionId, type TeamId } from "./constants";
 export function StrategyHUD({
   result, strat, isLoading, hasData, session, theme, rateLimitMessage,
   retryState = "idle", onRetryClick,
-  year, eventName, driver,
+  year, eventName, driver, targetDriver,
   historyRefreshSignal, onSelectHistory,
   telemetryHistoryRefreshSignal, onSelectTelemetryHistory,
   radioHistoryRefreshSignal,
@@ -35,6 +36,7 @@ export function StrategyHUD({
   year: number;
   eventName: string;
   driver: string;
+  targetDriver?: string | null;
   historyRefreshSignal?: number;
   onSelectHistory?: (item: AnalyzeHistoryItem) => void;
   telemetryHistoryRefreshSignal?: number;
@@ -276,6 +278,16 @@ export function StrategyHUD({
         )}
 
         <ReferencesPanel items={result?.citations} />
+
+        {hasData && result?.intent?.intent_type === "strategy" && driver && eventName && (
+          <ScenarioComparison
+            year={year}
+            event={eventName}
+            sessionType={session}
+            driver={driver}
+            targetDriver={targetDriver ?? null}
+          />
+        )}
 
         <RecentAnalyses refreshSignal={historyRefreshSignal} onSelect={onSelectHistory} />
         <RecentTelemetry
