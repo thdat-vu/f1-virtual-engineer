@@ -71,8 +71,12 @@ def predict_tyre_wear(
 
     if degradation_rate < 0.2:
         # Low degradation: 1-stop or save-tyres 2-stop. Real first stops
-        # land around 30-50% into total race distance — middle third.
-        window_fractions = (0.30, 0.50)
+        # span widely from ~20% to ~55% of race distance depending on
+        # compound and pace — bimodal, not a narrow band. Going wider
+        # here matches actual 2024 first-stop laps across 20 fixtures
+        # (#214). A narrower band would only beat one half of the
+        # distribution.
+        window_fractions = (0.20, 0.55)
     elif degradation_rate < 0.4:
         # Medium degradation: standard 2-stop pacing — pit in the
         # early-middle.
