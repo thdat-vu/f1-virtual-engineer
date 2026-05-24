@@ -24,6 +24,7 @@ from app.schemas.knowledge import (
     KnowledgeLookupResponse,
     KnowledgeNoteResponse,
 )
+from app.schemas.strategy_compare import StrategyCompareRequest, StrategyCompareResponse
 from app.schemas.lap_delta import LapDeltaRequest, LapDeltaResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
@@ -53,6 +54,7 @@ from tools.fastf1_helper import (
 )
 from tools.knowledge_retriever import get_note as knowledge_get_note, lookup as knowledge_lookup
 from tools.lap_delta import compute_lap_delta
+from tools.strategy_compare import compare_scenarios as compare_strategy_scenarios
 from tools.tyre_helper import compute_tyre_decay
 
 
@@ -661,6 +663,39 @@ async def analyze_tyre(
         status="error" if snapshot.get("fallback") else "success",
         **snapshot,
     )
+
+
+@app.post(
+    "/strategy/compare",
+    response_model=StrategyCompareResponse,
+    tags=["analysis"],
+    summary="Side-by-side what-if for 1-3 strategy scenarios",
+    description=(
+        "Runs `strategy_analyzer` once per scenario spec and returns one outcome "
+        "per slot — recommended pit window, confidence, expected gain, plus a "
+        "BM25 citation lookup using the scenario label as the query. Per-scenario "
+        "fail-closed: if one slot's helper raises, the others still return and "
+        "only that slot carries `fallback: true` with a reason."
+    ),
+)
+@limiter.limit("5/10seconds")
+async def compare_strategies(
+    request: Request,
+    body: StrategyCompareRequest,
+):
+    outcomes = await asyncio.to_thread(
+        compare_strategy_scenarios,
+        year=body.year,
+        event=body.event,
+        session_type=body.session_type,
+        driver=body.driver,
+        target_driver=body.target_driver,
+        scenarios=[s.model_dump() for s in body.scenarios],
+    )
+    return {
+        "status": "success",
+        "scenarios": outcomes,
+    }
 
 
 @app.post(
