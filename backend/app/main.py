@@ -19,7 +19,11 @@ from app.schemas.saved_queries import (
     SavedQueryItem,
     SavedQueryListResponse,
 )
-from app.schemas.knowledge import KnowledgeLookupRequest, KnowledgeLookupResponse
+from app.schemas.knowledge import (
+    KnowledgeLookupRequest,
+    KnowledgeLookupResponse,
+    KnowledgeNoteResponse,
+)
 from app.schemas.lap_delta import LapDeltaRequest, LapDeltaResponse
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
@@ -47,7 +51,7 @@ from tools.fastf1_helper import (
     get_year_schedule,
     load_prebaked_into_caches,
 )
-from tools.knowledge_retriever import lookup as knowledge_lookup
+from tools.knowledge_retriever import get_note as knowledge_get_note, lookup as knowledge_lookup
 from tools.lap_delta import compute_lap_delta
 from tools.tyre_helper import compute_tyre_decay
 
@@ -865,6 +869,35 @@ async def knowledge_lookup_endpoint(
         "query": body.query,
         "citations": citations,
     }
+
+
+@app.get(
+    "/knowledge/note/{note_id}",
+    response_model=KnowledgeNoteResponse,
+    tags=["knowledge"],
+    summary="Fetch a single corpus note by id (full body)",
+    description=(
+        "Returns the full untruncated body of a knowledge corpus entry. Used by the "
+        "citation chip popover in Mission Control after a chip is clicked. Returns "
+        "404 with a structured envelope when the id does not match any corpus entry."
+    ),
+)
+@limiter.limit("30/10seconds")
+async def knowledge_note_endpoint(
+    request: Request,
+    note_id: str,
+):
+    note = await asyncio.to_thread(knowledge_get_note, note_id)
+    if note is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "note": None,
+                "error": f"Knowledge note '{note_id}' not found.",
+            },
+        )
+    return {"status": "success", "note": note}
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from tests._helpers import reset_rate_limiter
 from tools.knowledge_retriever import (
     CORPUS_DIR,
     _parse_frontmatter,
+    get_note,
     lookup,
     reset_index_cache,
 )
@@ -79,6 +80,20 @@ class KnowledgeRetrieverTests(unittest.TestCase):
         self.assertEqual(lookup(""), [])
         self.assertEqual(lookup("!!!"), [])
 
+    def test_get_note_returns_full_body_for_existing_id(self):
+        note = get_note("strategy-undercut")
+        self.assertIsNotNone(note)
+        assert note is not None  # type narrow for mypy/pylance
+        self.assertEqual(note["id"], "strategy-undercut")
+        self.assertIn("undercut", note["topics"])
+        # Body must be the untruncated text — longer than the lookup snippet limit (260).
+        self.assertGreater(len(note["body"]), 260)
+        self.assertNotIn("…", note["body"])
+
+    def test_get_note_returns_none_for_unknown_id(self):
+        self.assertIsNone(get_note("does-not-exist"))
+        self.assertIsNone(get_note(""))
+
 
 class KnowledgeLookupEndpointTests(unittest.TestCase):
     def setUp(self):
@@ -113,6 +128,38 @@ class KnowledgeLookupEndpointTests(unittest.TestCase):
         schema = self.client.get("/openapi.json").json()
         self.assertIn("/knowledge/lookup", schema["paths"])
         operation = schema["paths"]["/knowledge/lookup"]["post"]
+        self.assertIn("knowledge", operation["tags"])
+
+
+class KnowledgeNoteEndpointTests(unittest.TestCase):
+    def setUp(self):
+        reset_rate_limiter()
+        reset_index_cache()
+        self.client = TestClient(app)
+
+    def test_endpoint_returns_full_body_for_existing_id(self):
+        res = self.client.get("/knowledge/note/strategy-undercut")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["status"], "success")
+        note = body["note"]
+        self.assertEqual(note["id"], "strategy-undercut")
+        self.assertIn("undercut", note["topics"])
+        # Untruncated body — longer than the snippet limit used by /lookup.
+        self.assertGreater(len(note["body"]), 260)
+
+    def test_endpoint_returns_404_for_missing_id(self):
+        res = self.client.get("/knowledge/note/does-not-exist")
+        self.assertEqual(res.status_code, 404)
+        body = res.json()
+        self.assertEqual(body["status"], "error")
+        self.assertIsNone(body["note"])
+        self.assertIn("not found", body["error"])
+
+    def test_endpoint_openapi_registration(self):
+        schema = self.client.get("/openapi.json").json()
+        self.assertIn("/knowledge/note/{note_id}", schema["paths"])
+        operation = schema["paths"]["/knowledge/note/{note_id}"]["get"]
         self.assertIn("knowledge", operation["tags"])
 
 

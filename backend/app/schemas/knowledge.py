@@ -23,3 +23,20 @@ class KnowledgeLookupResponse(BaseModel):
     query: str
     citations: list[KnowledgeCitation] = Field(default_factory=list)
     error: str | None = None
+
+
+class KnowledgeNote(BaseModel):
+    """Full corpus entry (untruncated body) returned by GET /knowledge/note/{id}."""
+
+    id: str
+    title: str
+    source: str
+    section: str
+    topics: list[str] = Field(default_factory=list)
+    body: str
+
+
+class KnowledgeNoteResponse(BaseModel):
+    status: Literal["success", "error"]
+    note: KnowledgeNote | None = None
+    error: str | None = None

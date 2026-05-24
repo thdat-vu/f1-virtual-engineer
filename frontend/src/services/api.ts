@@ -687,3 +687,37 @@ export async function getLapDelta(
   }
   return (await response.json()) as LapDeltaResponse;
 }
+
+export interface KnowledgeNote {
+  id: string;
+  title: string;
+  source: string;
+  section: string;
+  topics: string[];
+  body: string;
+}
+
+export interface KnowledgeNoteResponse {
+  status: "success" | "error";
+  note: KnowledgeNote | null;
+  error?: string | null;
+}
+
+export async function getKnowledgeNote(
+  noteId: string,
+): Promise<KnowledgeNote | null> {
+  // Fetch the full untruncated body of a single corpus note. Used by the
+  // citation chip popover after a chip is clicked. Returns null on 404 or
+  // any error so the caller can degrade silently — the popover just falls
+  // back to the snippet already in `KnowledgeCitation`.
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/knowledge/note/${encodeURIComponent(noteId)}`,
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as KnowledgeNoteResponse;
+    return payload.note;
+  } catch {
+    return null;
+  }
+}

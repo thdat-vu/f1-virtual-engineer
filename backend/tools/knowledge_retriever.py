@@ -144,3 +144,27 @@ def lookup(query: str, k: int = 3) -> list[dict[str, Any]]:
 def reset_index_cache() -> None:
     """Test helper — force the BM25 index to reload on next lookup."""
     _index.cache_clear()
+
+
+def get_note(note_id: str) -> dict[str, Any] | None:
+    """Return a single corpus entry by id with the full body, or None if missing.
+
+    Used by ``GET /knowledge/note/{id}`` so the frontend can show the whole
+    note in a popover after a citation chip is clicked. ``lookup`` returns
+    a truncated ``snippet``; this returns the untruncated ``body`` so the
+    UI never has to refetch the corpus file itself.
+    """
+    if not note_id:
+        return None
+    _, entries = _index()
+    for entry in entries:
+        if entry.id == note_id:
+            return {
+                "id": entry.id,
+                "title": entry.title,
+                "source": entry.source,
+                "section": entry.section,
+                "topics": list(entry.topics),
+                "body": entry.body,
+            }
+    return None
