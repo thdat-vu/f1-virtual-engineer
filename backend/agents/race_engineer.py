@@ -531,7 +531,15 @@ def analyze_query(
     start_time = monotonic()
     start_trace()
     citations: list[dict[str, Any]] = []
-    if KNOWLEDGE_PATTERN.search(query or ""):
+    # Two trigger paths into RAG retrieval, kept tight so we don't dilute the
+    # signal with citations on pure telemetry questions:
+    #   1. KNOWLEDGE_PATTERN — explicit FIA / regulation language ("DRS rule",
+    #      "yellow flag", "pit lane speed").
+    #   2. STRATEGY_PATTERN — strategy intent ("should I pit", "undercut",
+    #      "tyre wear"). The strategy-notes corpus (undercut, overcut, SC
+    #      window, tyre cliff, …) only matters here, and BM25 over the raw
+    #      strategy question is enough to surface the right note.
+    if KNOWLEDGE_PATTERN.search(query or "") or STRATEGY_PATTERN.search(query or ""):
         try:
             citations = knowledge_lookup(query, 2) or []
         except Exception:  # noqa: BLE001 — retrieval must never break /analyze

@@ -61,9 +61,11 @@ _SYSTEM_PROMPT = (
     "values supplied in the JSON context — do NOT invent or extrapolate. (2) If a value "
     "is missing, omit that detail rather than guess. (3) No markdown, no bullet points, "
     "no preamble like 'Here is the summary'. Just the engineer's call. "
-    "(4) When the context contains a non-empty `citations` list, you MAY ground a "
-    "regulation claim by quoting the citation's `title` or `section` verbatim — never "
-    "paraphrase the regulation text or invent article numbers."
+    "(4) When the context contains a non-empty `citations` list, you MAY ground your "
+    "call by quoting the citation's `title` or `section` verbatim — never paraphrase the "
+    "snippet text or invent article numbers. Citations may be FIA regulations OR strategy "
+    "concepts (undercut, overcut, SC pit window, tyre cliff, …); cite the closest match "
+    "by name when it directly supports the recommendation."
 )
 
 

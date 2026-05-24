@@ -50,6 +50,27 @@ class KnowledgeRetrieverTests(unittest.TestCase):
         self.assertTrue(hits)
         self.assertEqual(hits[0]["id"], "pit-lane-speed")
 
+    def test_lookup_undercut_returns_strategy_entry(self):
+        hits = lookup("should I undercut now to gain track position")
+        self.assertTrue(hits, "expected at least one strategy hit")
+        self.assertEqual(hits[0]["id"], "strategy-undercut")
+        self.assertIn("undercut", hits[0]["topics"])
+
+    def test_lookup_safety_car_pit_window_prefers_strategy_entry(self):
+        # The FIA "safety-car" entry covers procedure; the strategy entry
+        # covers the pit-window decision. A strategy-shaped query should
+        # surface the strategy snippet ahead of the rules text.
+        hits = lookup("safety car pit window — should we pit now to save time")
+        self.assertTrue(hits)
+        ids = [h["id"] for h in hits]
+        self.assertIn("strategy-sc-pit-window", ids)
+        self.assertEqual(ids[0], "strategy-sc-pit-window")
+
+    def test_lookup_tyre_cliff_returns_strategy_entry(self):
+        hits = lookup("rear tyre cliff degradation lap time falling off")
+        self.assertTrue(hits)
+        self.assertEqual(hits[0]["id"], "strategy-tyre-cliff")
+
     def test_lookup_respects_k(self):
         hits = lookup("safety car restart tyre compound drs", k=2)
         self.assertLessEqual(len(hits), 2)

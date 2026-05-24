@@ -100,6 +100,30 @@ class RaceEngineerTests(unittest.TestCase):
         self.assertTrue(result["citations"], "expected DRS citation for regulation query")
         self.assertEqual(result["citations"][0]["id"], "drs-activation")
 
+    @patch("agents.race_engineer.strategy_analyzer")
+    def test_analyze_query_attaches_citations_for_strategy_intent(self, mock_strategy):
+        # Strategy queries should also fetch citations even without explicit
+        # FIA-vocabulary keywords. The strategy-notes corpus is the whole
+        # point of slice B (#197); without this trigger the LLM can't ground
+        # its rationale in things like "undercut" / "tyre cliff".
+        mock_strategy.return_value = {
+            "driver": "HAM",
+            "year": 2023,
+            "event": "Japanese Grand Prix",
+            "session_type": "R",
+            "strategy": {
+                "recommended_pit_window_laps": [18, 22],
+                "confidence_band": "medium",
+                "undercut_risk": "medium",
+            },
+            "fallback": False,
+            "fallback_reason": None,
+        }
+        result = analyze_query("should HAM undercut now in japan 2023 race")
+        self.assertTrue(result["citations"], "expected strategy citation for undercut query")
+        ids = [c["id"] for c in result["citations"]]
+        self.assertIn("strategy-undercut", ids)
+
     @patch("agents.race_engineer.knowledge_lookup")
     @patch("agents.race_engineer.get_session_telemetry_summary")
     def test_analyze_query_citation_failure_is_swallowed(self, mock_summary, mock_lookup):
