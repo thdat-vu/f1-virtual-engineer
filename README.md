@@ -145,6 +145,18 @@ RUN_STRATEGY_PIT_EVAL=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
 
 The `-s` flag matters — the summary line goes to stdout. Use this whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
 
+**Latest run (2026-05-24, 5 fixtures, ±2 laps tolerance):** 2/5 passed (40%).
+
+```
+[FAIL] 2024-japan-r-ver:    recommended 12-18, actual 1   (lap-1 SC incident, not a strategy call)
+[PASS] 2024-italy-r-lec:    recommended 12-18, actual 15
+[PASS] 2023-japan-r-ver:    recommended 12-18, actual 16
+[FAIL] 2024-spain-r-nor:    recommended 12-18, actual 23
+[FAIL] 2024-britain-r-ham:  recommended 12-18, actual 27
+```
+
+What the eval surfaced — and why it's the point of having it: the current heuristic returns the same `12-18` window for every fixture across four different circuits. That's a real signal, not a calibration issue, and is why a numerical accuracy harness matters more than another regression-drift baseline. Tracked as a follow-up so the next change to `predict_tyre_wear` / `strategy_analyzer` has a yardstick to beat.
+
 ---
 
 ## Getting Started
