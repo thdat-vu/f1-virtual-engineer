@@ -145,17 +145,27 @@ RUN_STRATEGY_PIT_EVAL=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
 
 The `-s` flag matters — the summary line goes to stdout. Use this whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
 
-**Latest run (2026-05-24, 5 fixtures, ±2 laps tolerance):** 4/5 passed (80%) — up from 2/5 after #210.
+**Latest run (2026-05-24, 20 fixtures, ±2 laps tolerance):** 13/20 passed (65%).
 
 ```
-[FAIL] 2024-japan-r-ver:    recommended 16-26, actual 1   (lap-1 SC incident, not a strategy call)
-[PASS] 2024-italy-r-lec:    recommended 16-26, actual 15
-[PASS] 2023-japan-r-ver:    recommended 16-26, actual 16
-[PASS] 2024-spain-r-nor:    recommended 20-33, actual 23
-[PASS] 2024-britain-r-ham:  recommended 16-26, actual 27
+[PASS] 2023-japan-r-ver,    2024-italy-r-lec,   2024-spain-r-nor,
+       2024-britain-r-ham,  2024-bahrain-r-ver, 2024-miami-r-nor,
+       2024-imola-r-ver,    2024-canada-r-rus,  2024-austria-r-rus,
+       2024-belgium-r-ham,  2024-singapore-r-nor,
+       2024-mexico-r-sai,   2024-brazil-r-ver
+[FAIL] 2024-japan-r-ver     (lap-1 SC incident, not a strategy call)
+[FAIL] 2024-saudi-r-ver,    2024-china-r-ver,   2024-hungary-r-nor,
+       2024-vegas-r-rus,    2023-bahrain-r-ver  (heuristic skews slightly late)
+[FAIL] 2024-australia-r-sai (heuristic skewed early — high-deg tier picked wrong)
 ```
 
-The first run (40%) surfaced that `predict_tyre_wear` returned the same `12-18` window for every fixture across four circuits — a real heuristic limitation, not a measurement noise issue. Tracked as [#210](https://github.com/thdat-vu/f1-virtual-engineer/issues/210); the smallest defensible fix was scaling the drop window proportionally to `lap_count` rather than treating it as a constant. Spain (66 laps) now gets `20-33`, the 53-lap circuits get `16-26`, and four of five fixtures bracket their actual first stop. The remaining FAIL is a lap-1 safety-car incident — outside the scope of any tyre-wear heuristic.
+The arc behind these numbers:
+
+1. **Slice A (5 fixtures, [#208](https://github.com/thdat-vu/f1-virtual-engineer/issues/208)):** initial run scored 2/5 (40%) and surfaced that `predict_tyre_wear` returned the same `12-18` window for every fixture across four circuits — a real heuristic limitation, not measurement noise.
+2. **Fix ([#210](https://github.com/thdat-vu/f1-virtual-engineer/issues/210)):** scaled the drop window proportionally to `lap_count` instead of treating it as a constant. Slice-A score moved to 4/5 (80%); the remaining FAIL was a lap-1 safety-car incident outside any tyre-wear heuristic's scope.
+3. **Slice B (20 fixtures, this run):** broader sample lands at 13/20 (65%). The drop reflects sample size, not a regression — the heuristic skews slightly late on several races (Hungary, Vegas, Bahrain '23 all actual < window start), which is the next yardstick to beat.
+
+Numbers are from a primed local FastF1 cache; CI doesn't run the harness because the cache lives under `backend/data/` and is gitignored.
 
 ---
 
