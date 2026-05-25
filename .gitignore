@@ -161,6 +161,7 @@ backend/data/
 *.json
 !package.json
 !tsconfig.json
+!backend/evals/cases/*.json
 
 # Node.js
 node_modules/

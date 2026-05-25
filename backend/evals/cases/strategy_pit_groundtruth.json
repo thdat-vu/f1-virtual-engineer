@@ -1,0 +1,402 @@
+{
+  "2024-japan-r-ver": {
+    "actual_first_pit_lap": 1,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "Japanese Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 53,
+        "stint_count": 4,
+        "lap_time_decay_seconds_per_lap": -0.7094400000000002,
+        "stint_progress_ratio": 0.3584905660377358,
+        "avg_track_temp_c": 37.50110497237569,
+        "track_temp_trend_c_per_lap": -0.04222222222222221,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-italy-r-lec": {
+    "actual_first_pit_lap": 15,
+    "tyre_features_envelope": {
+      "driver": "LEC",
+      "year": 2024,
+      "event": "Italian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 53,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.09444230769230771,
+        "stint_progress_ratio": 0.7169811320754716,
+        "avg_track_temp_c": 49.31127819548872,
+        "track_temp_trend_c_per_lap": -0.06515151515151517,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2023-japan-r-ver": {
+    "actual_first_pit_lap": 16,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2023,
+      "event": "Japanese Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 53,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.487326530612245,
+        "stint_progress_ratio": 0.3018867924528302,
+        "avg_track_temp_c": 42.070253164556966,
+        "track_temp_trend_c_per_lap": -0.06560509554140126,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-spain-r-nor": {
+    "actual_first_pit_lap": 23,
+    "tyre_features_envelope": {
+      "driver": "NOR",
+      "year": 2024,
+      "event": "Spanish Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 66,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.06570769230769231,
+        "stint_progress_ratio": 0.2878787878787879,
+        "avg_track_temp_c": 41.096103896103905,
+        "track_temp_trend_c_per_lap": 0.005228758169934622,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-britain-r-ham": {
+    "actual_first_pit_lap": 27,
+    "tyre_features_envelope": {
+      "driver": "HAM",
+      "year": 2024,
+      "event": "British Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 52,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.11545098039215697,
+        "stint_progress_ratio": 0.2692307692307692,
+        "avg_track_temp_c": 27.670068027210885,
+        "track_temp_trend_c_per_lap": -0.013013698630137,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-bahrain-r-ver": {
+    "actual_first_pit_lap": 17,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "Bahrain Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 57,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.042160714285714364,
+        "stint_progress_ratio": 0.3508771929824561,
+        "avg_track_temp_c": 23.652866242038222,
+        "track_temp_trend_c_per_lap": -0.029487179487179497,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-saudi-r-ver": {
+    "actual_first_pit_lap": 7,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "Saudi Arabian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 50,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.07940425531914892,
+        "stint_progress_ratio": 0.86,
+        "avg_track_temp_c": 31.59315068493151,
+        "track_temp_trend_c_per_lap": -0.03103448275862069,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-australia-r-sai": {
+    "actual_first_pit_lap": 16,
+    "tyre_features_envelope": {
+      "driver": "SAI",
+      "year": 2024,
+      "event": "Australian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 58,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": 0.4032982456140351,
+        "stint_progress_ratio": 0.29310344827586204,
+        "avg_track_temp_c": 38.40208333333333,
+        "track_temp_trend_c_per_lap": -0.0006993006993007093,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-china-r-ver": {
+    "actual_first_pit_lap": 13,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "Chinese Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 56,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.02451923076923088,
+        "stint_progress_ratio": 0.5892857142857143,
+        "avg_track_temp_c": 29.792727272727273,
+        "track_temp_trend_c_per_lap": -0.0329268292682927,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-miami-r-nor": {
+    "actual_first_pit_lap": 29,
+    "tyre_features_envelope": {
+      "driver": "NOR",
+      "year": 2024,
+      "event": "Miami Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 57,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.13352727272727263,
+        "stint_progress_ratio": 0.49122807017543857,
+        "avg_track_temp_c": 44.664,
+        "track_temp_trend_c_per_lap": -0.0395973154362416,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-imola-r-ver": {
+    "actual_first_pit_lap": 24,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "Emilia Romagna Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 63,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.029774193548387156,
+        "stint_progress_ratio": 0.6190476190476191,
+        "avg_track_temp_c": 42.023776223776224,
+        "track_temp_trend_c_per_lap": -0.014788732394366207,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-canada-r-rus": {
+    "actual_first_pit_lap": 25,
+    "tyre_features_envelope": {
+      "driver": "RUS",
+      "year": 2024,
+      "event": "Canadian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 70,
+        "stint_count": 4,
+        "lap_time_decay_seconds_per_lap": -0.4177971014492754,
+        "stint_progress_ratio": 0.22857142857142856,
+        "avg_track_temp_c": 24.569911504424784,
+        "track_temp_trend_c_per_lap": 0.04642857142857142,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-austria-r-rus": {
+    "actual_first_pit_lap": 22,
+    "tyre_features_envelope": {
+      "driver": "RUS",
+      "year": 2024,
+      "event": "Austrian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 71,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.06011428571428569,
+        "stint_progress_ratio": 0.352112676056338,
+        "avg_track_temp_c": 46.420979020979026,
+        "track_temp_trend_c_per_lap": -0.01971830985915496,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-hungary-r-nor": {
+    "actual_first_pit_lap": 17,
+    "tyre_features_envelope": {
+      "driver": "NOR",
+      "year": 2024,
+      "event": "Hungarian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 70,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.07805797101449269,
+        "stint_progress_ratio": 0.35714285714285715,
+        "avg_track_temp_c": 44.91612903225806,
+        "track_temp_trend_c_per_lap": 0.027272727272727244,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-belgium-r-ham": {
+    "actual_first_pit_lap": 11,
+    "tyre_features_envelope": {
+      "driver": "HAM",
+      "year": 2024,
+      "event": "Belgian Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 44,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.13176744186046505,
+        "stint_progress_ratio": 0.4090909090909091,
+        "avg_track_temp_c": 42.26715328467153,
+        "track_temp_trend_c_per_lap": 0.00588235294117645,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-singapore-r-nor": {
+    "actual_first_pit_lap": 30,
+    "tyre_features_envelope": {
+      "driver": "NOR",
+      "year": 2024,
+      "event": "Singapore Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 62,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.04101639344262311,
+        "stint_progress_ratio": 0.5161290322580645,
+        "avg_track_temp_c": 36.445625,
+        "track_temp_trend_c_per_lap": -0.018238993710691816,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-mexico-r-sai": {
+    "actual_first_pit_lap": 32,
+    "tyre_features_envelope": {
+      "driver": "SAI",
+      "year": 2024,
+      "event": "Mexico City Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 71,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.380557142857143,
+        "stint_progress_ratio": 0.5492957746478874,
+        "avg_track_temp_c": 35.60251572327045,
+        "track_temp_trend_c_per_lap": -0.01455696202531646,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-brazil-r-ver": {
+    "actual_first_pit_lap": 32,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2024,
+      "event": "S\u00e3o Paulo Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 69,
+        "stint_count": 2,
+        "lap_time_decay_seconds_per_lap": -0.27028787878787874,
+        "stint_progress_ratio": 0.5362318840579711,
+        "avg_track_temp_c": 25.769651741293536,
+        "track_temp_trend_c_per_lap": -0.015999999999999997,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2024-vegas-r-rus": {
+    "actual_first_pit_lap": 12,
+    "tyre_features_envelope": {
+      "driver": "RUS",
+      "year": 2024,
+      "event": "Las Vegas Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 50,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.11020408163265288,
+        "stint_progress_ratio": 0.36,
+        "avg_track_temp_c": 17.723776223776223,
+        "track_temp_trend_c_per_lap": -0.011267605633802802,
+        "temperature_missing": false
+      }
+    }
+  },
+  "2023-bahrain-r-ver": {
+    "actual_first_pit_lap": 14,
+    "tyre_features_envelope": {
+      "driver": "VER",
+      "year": 2023,
+      "event": "Bahrain Grand Prix",
+      "session_type": "R",
+      "fallback": false,
+      "fallback_reason": null,
+      "features": {
+        "lap_count": 57,
+        "stint_count": 3,
+        "lap_time_decay_seconds_per_lap": -0.047250000000000014,
+        "stint_progress_ratio": 0.3684210526315789,
+        "avg_track_temp_c": 31.01180124223602,
+        "track_temp_trend_c_per_lap": -0.040000000000000015,
+        "temperature_missing": false
+      }
+    }
+  }
+}

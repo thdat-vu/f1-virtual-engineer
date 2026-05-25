@@ -30,6 +30,14 @@ jobs:
         run: |
           python -m unittest discover -s backend/tests -p 'test_*.py'
 
+      - name: Strategy pit-accuracy gate (snapshot mode)
+        env:
+          PYTHONPATH: backend
+          STRATEGY_PIT_EVAL_SNAPSHOT: '1'
+        run: |
+          pip install pytest
+          python -m pytest backend/tests/test_strategy_pit_eval.py -s
+
   frontend-build:
     runs-on: ubuntu-latest
     steps:

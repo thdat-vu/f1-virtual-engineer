@@ -136,14 +136,23 @@ Each fixture asserts that every `expected_substrings` entry appears in the gener
 
 ### Strategy pit-accuracy eval
 
-`backend/evals/cases/strategy_pit_fixtures.py` lists historical race-driver pairings whose first-stop lap the heuristic should bracket. The harness derives ground truth from FastF1 lap data at runtime (no hardcoded lap numbers), runs `strategy_analyzer` per fixture, and prints the pass rate against a ±2-lap tolerance band. Opt-in via `RUN_STRATEGY_PIT_EVAL=1`:
+`backend/evals/cases/strategy_pit_fixtures.py` lists historical race-driver pairings whose first-stop lap the heuristic should bracket. Two run modes share the same fixtures and tolerance band:
+
+- **Live mode (`RUN_STRATEGY_PIT_EVAL=1`)** — derives ground truth from FastF1 lap data at runtime. Used locally to regenerate the snapshot when fixtures change.
+- **Snapshot mode (`STRATEGY_PIT_EVAL_SNAPSHOT=1`)** — reads `evals/cases/strategy_pit_groundtruth.json`, which carries both the actual pit lap and the cached tyre-feature envelope per fixture. No FastF1 dependency — this is what CI runs on every PR (#220).
 
 ```bash
 cd backend
+# local, FastF1 cache primed under backend/data/
 RUN_STRATEGY_PIT_EVAL=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
+
+# what CI runs — offline, snapshot only
+STRATEGY_PIT_EVAL_SNAPSHOT=1 python3 -m pytest tests/test_strategy_pit_eval.py -s
 ```
 
-The `-s` flag matters — the summary line goes to stdout. Use this whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
+CI fails the build if snapshot-mode pass count drops below `SNAPSHOT_PASS_THRESHOLD` in `tests/test_strategy_pit_eval.py` (currently **17/20**). Bump the threshold manually when the heuristic genuinely improves and the snapshot has been regenerated — keep the numbers in lockstep.
+
+The `-s` flag matters — the summary line goes to stdout. Use the live mode whenever the tyre-wear or pit-window heuristic in `tools/strategy_helper.py` changes; it answers "is the recommendation right?" against reality, complementing the regression-drift coverage in `eval/run_strategy_eval.py`.
 
 **Latest run (2026-05-24, 20 fixtures, ±2 laps tolerance):** 17/20 passed (85%).
 
