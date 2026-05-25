@@ -368,4 +368,4 @@ To guarantee reliability in race-critical scenarios, the system implements:
 
 ---
 
-*Developed by ヴ・タイン・ダット - Showcasing the future of Agentic AI in high-performance sports.*
+*Developed by Vu Thanh Dat (ヴ・タイン・ダット) - Showcasing the future of Agentic AI in high-performance sports.*
