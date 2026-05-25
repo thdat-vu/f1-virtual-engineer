@@ -45,5 +45,14 @@ class TyreAnalyzeResponse(BaseModel):
             "being viewed. Null on fallback or empty roster."
         ),
     )
+    actual_pit_laps: list[int] = Field(
+        default_factory=list,
+        description=(
+            "Absolute lap numbers where pit-ins were recorded for this driver. "
+            "Empty for live/in-progress sessions where no stops have happened yet, "
+            "and for fallback envelopes. Issue #223: lets the UI ground a cliff "
+            "heuristic in what actually happened on historical sessions."
+        ),
+    )
     fallback: bool = False
     fallback_reason: str | None = None

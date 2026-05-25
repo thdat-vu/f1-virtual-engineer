@@ -626,6 +626,11 @@ export interface TyreAnalyzeResponse {
   // UI can show "as of L52" and the viewer doesn't read the card as
   // a real-time call about whatever lap they're currently viewing.
   last_lap_number?: number | null;
+  // Issue #223: actual pit-in laps from the loaded roster. Lets the
+  // historical card surface "Actual stops: L16, L34" and reframe the
+  // cliff heuristic in past tense rather than telling the viewer to
+  // "pit now" on a finished race.
+  actual_pit_laps?: number[];
   fallback: boolean;
   fallback_reason?: string | null;
 }

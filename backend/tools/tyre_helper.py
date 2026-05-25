@@ -35,6 +35,7 @@ def _empty_envelope(
         "cliff_lap_estimate": None,
         "confidence_band": "low",
         "last_lap_number": None,
+        "actual_pit_laps": [],
     }
 
 
@@ -139,6 +140,7 @@ def compute_tyre_decay(
     compound: str | None = None
     stint_laps: int = 0
     last_lap_number: int | None = None
+    actual_pit_laps: list[int] = []
     try:
         roster = get_session_lap_list(year, event, session_type, driver)
         if not roster.get("fallback"):
@@ -152,8 +154,18 @@ def compute_tyre_decay(
                 tail = laps_list[-1].get("lap_number")
                 if isinstance(tail, int):
                     last_lap_number = tail
+            # Issue #223: surface the actual pit-in laps so the historical
+            # card can ground the cliff heuristic in what really happened
+            # ("Actual stops: L16, L34") instead of telling the viewer to
+            # "pit now" on a race that finished a year ago.
+            for lap in laps_list:
+                if lap.get("is_pit_in"):
+                    n = lap.get("lap_number")
+                    if isinstance(n, int):
+                        actual_pit_laps.append(n)
     except Exception:  # noqa: BLE001 — degrade silently
         compound, stint_laps, last_lap_number = None, 0, None
+        actual_pit_laps = []
 
     cliff = _cliff_lap_estimate(
         decay_per_lap=decay,
@@ -174,4 +186,5 @@ def compute_tyre_decay(
         "cliff_lap_estimate": int(cliff) if cliff is not None else None,
         "confidence_band": confidence,
         "last_lap_number": last_lap_number,
+        "actual_pit_laps": actual_pit_laps,
     }

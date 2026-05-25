@@ -31,9 +31,16 @@ interface Headline {
 // "Cliff" in the backend is laps-from-stint-start, not race lap. So
 // laps_to_cliff = cliff − stint_laps tells us how many laps of life
 // the current set has left before the heuristic predicts pace drop.
+//
+// Issue #223: this app only loads finished sessions from FastF1 — there
+// is no live mode. Imperative copy ("pit now") reads as a real-time
+// instruction even though the race finished. When the roster contains
+// actual pit-in laps we know stops already happened, so we drop the
+// imperative and frame the card analytically.
 function deriveHeadline(
   lapsToCliff: number | null,
   hasCliff: boolean,
+  isHistorical: boolean,
 ): Headline {
   if (!hasCliff) {
     // Backend couldn't fit a slope (FastF1 sparse, sprint, etc).
@@ -43,17 +50,26 @@ function deriveHeadline(
   }
   const n = lapsToCliff ?? 0;
   if (n <= 0) {
-    // Past the cliff is the moment this card actually earns its
-    // demo slot — the driver should already have pitted.
-    return { tone: "error", text: "Past the cliff · pit now" };
+    return {
+      tone: "error",
+      text: isHistorical
+        ? "Final stint past predicted cliff"
+        : "Past the cliff · pit now",
+    };
   }
   if (n <= 5) {
     return {
       tone: "warn",
-      text: `Cliff in ${n} lap${n === 1 ? "" : "s"} · pit window open`,
+      text: isHistorical
+        ? `Stint ending within ${n} lap${n === 1 ? "" : "s"} of cliff`
+        : `Cliff in ${n} lap${n === 1 ? "" : "s"} · pit window open`,
     };
   }
   return { tone: "ok", text: `~${n} laps before pace drops` };
+}
+
+function formatPitLaps(laps: number[]): string {
+  return laps.map((n) => `L${n}`).join(", ");
 }
 
 export function TyreCard({
@@ -93,10 +109,16 @@ export function TyreCard({
   const stint = data?.stint_laps ?? 0;
   const confidence = data?.confidence_band ?? "low";
   const isFallback = data?.fallback ?? false;
+  const actualPitLaps = data?.actual_pit_laps ?? [];
+  // Issue #223: every session this app loads is finished — FastF1's
+  // cache is what drives the card. The presence of recorded pit-in
+  // laps is the strongest signal that we're looking at a completed
+  // race rather than a live session, so use it to gate imperative copy.
+  const isHistorical = actualPitLaps.length > 0;
 
   const hasCliff = cliff != null && cliff > 0;
   const lapsToCliff = hasCliff ? (cliff as number) - stint : null;
-  const headline = deriveHeadline(lapsToCliff, hasCliff);
+  const headline = deriveHeadline(lapsToCliff, hasCliff, isHistorical);
 
   // Progress fill: stint progress toward the cliff. Clamp to 100% so
   // "past the cliff" maxes out the bar visually instead of overflowing.
@@ -150,13 +172,27 @@ export function TyreCard({
 
           {/* Issue #185: snapshot lap context. The card always reflects
               the last lap in the loaded roster — without this line the
-              viewer can read "Past the cliff · pit now" as a call about
-              whatever lap they're currently viewing on the chart. */}
+              viewer can read the headline as a call about whatever lap
+              they're currently viewing on the chart.
+              Issue #223: spell out "race finish" for historical sessions
+              so "as of L58" doesn't read as a live snapshot. */}
           <p className="readout mt-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-foreground-faint">
             {data.last_lap_number != null
-              ? `as of L${data.last_lap_number}`
+              ? isHistorical
+                ? `as of L${data.last_lap_number} · race finish`
+                : `as of L${data.last_lap_number}`
               : "as of last available lap"}
           </p>
+
+          {/* Issue #223: ground the cliff heuristic in what actually
+              happened. For a multi-stop race the user's first question
+              is "what lap did they actually pit?" — answer it directly
+              instead of leaving them to read "pit now" as live advice. */}
+          {isHistorical && (
+            <p className="readout mt-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-foreground-dim">
+              actual stops: {formatPitLaps(actualPitLaps)}
+            </p>
+          )}
 
           {hasCliff && (
             <>

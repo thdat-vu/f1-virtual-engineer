@@ -67,6 +67,8 @@ class TyreHelperTests(unittest.TestCase):
         self.assertEqual(result["cliff_lap_estimate"], 8)
         # #185: snapshot lap is the last lap in the loaded roster.
         self.assertEqual(result["last_lap_number"], 20)
+        # #223: actual pit-in laps surfaced for historical grounding.
+        self.assertEqual(result["actual_pit_laps"], [12])
 
     def test_steep_decay_pulls_cliff_earlier(self):
         # Same window but decay > 0.45 — estimator should subtract 2.
@@ -117,6 +119,24 @@ class TyreHelperTests(unittest.TestCase):
         self.assertIsNone(result["cliff_lap_estimate"])
         self.assertEqual(result["confidence_band"], "low")
         self.assertIsNone(result["last_lap_number"])
+        self.assertEqual(result["actual_pit_laps"], [])
+
+    def test_multi_stop_race_returns_all_pit_laps(self):
+        # Three-stint race: pits on lap 16 and lap 34. Snapshot at lap 58
+        # (race finish). Mirrors the AU GP LEC scenario from #223 where
+        # the card said "pit now" for a finished race.
+        roster = _roster(laps=[
+            {"lap_number": i, "lap_time_seconds": 85.0, "compound": "HARD",
+             "is_pit_in": i in (16, 34), "is_pit_out": i in (17, 35)}
+            for i in range(1, 59)
+        ])
+        with patch.object(tyre_helper, "predict_tyre_wear", return_value=_prediction_envelope(
+            decay=0.20, drop_window=[8, 14],
+        )), patch.object(tyre_helper, "get_session_lap_list", return_value=roster):
+            result = tyre_helper.compute_tyre_decay(2024, "Italian Grand Prix", "R", "HAM")
+
+        self.assertEqual(result["actual_pit_laps"], [16, 34])
+        self.assertEqual(result["last_lap_number"], 58)
 
     def test_roster_fallback_keeps_prediction_data(self):
         # Lap roster blowing up must not blank the whole card — we still
