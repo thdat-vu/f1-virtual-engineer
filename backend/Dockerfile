@@ -32,10 +32,23 @@ RUN pip install --no-cache-dir --prefix=/install -r /build/requirements.txt
 #      unused. If a future dep does use discovery, drop this
 #      line.)
 #   bytecode caches and *.pyi stubs ……………………………………… small
-RUN find /install -type d \( -name tests -o -name test -o -name testing \) -exec rm -rf {} + 2>/dev/null || true \
+#
+# Match `tests/` (plural) only — the convention for *bundled* tests.
+# Do NOT match `testing/` (e.g. `numpy/testing/`, `pandas/testing/`,
+# `matplotlib/testing/`) — those are public API modules used by lazy
+# imports inside fastf1's decoders, and removing them produces a
+# `No module named 'numpy.testing'` envelope along certain telemetry
+# paths (#218). The build-time guard below catches any regression.
+RUN find /install -type d -name tests -exec rm -rf {} + 2>/dev/null || true \
  && rm -rf /install/lib/python3.11/site-packages/googleapiclient/discovery_cache/documents \
  && find /install -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
  && find /install -type f \( -name '*.pyc' -o -name '*.pyi' \) -delete
+
+# Fail the build if cleanup ever nukes a public testing module again.
+# The site-packages tree from /install/lib/python3.11/site-packages is
+# what gets copied into the runtime image, so resolve from there.
+RUN PYTHONPATH=/install/lib/python3.11/site-packages python -c \
+    "import numpy.testing, pandas.testing"
 
 # ──────────────────────────────────────────────────────────────
 # Stage 2 — runtime: slim image with only the installed site-
