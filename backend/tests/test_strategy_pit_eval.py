@@ -45,10 +45,11 @@ from evals.cases.strategy_pit_fixtures import FIXTURES
 PIT_LAP_TOLERANCE = 2
 
 # Threshold for snapshot-mode CI gate. The current live baseline is
-# 17/20; the threshold is set to the same number so any drop trips CI.
-# Bump manually when the heuristic genuinely improves AND the snapshot
-# is regenerated — keep the numbers in lockstep.
-SNAPSHOT_PASS_THRESHOLD = 17
+# 18/20 after #216 (high-deg cutoff bumped 0.4 → 0.5 to reclassify
+# Australia 2024 SAI). The threshold matches the baseline so any drop
+# trips CI. Bump manually when the heuristic genuinely improves AND
+# the snapshot is regenerated — keep the numbers in lockstep.
+SNAPSHOT_PASS_THRESHOLD = 18
 
 GROUNDTRUTH_PATH = (
     _BACKEND_DIR / "evals" / "cases" / "strategy_pit_groundtruth.json"

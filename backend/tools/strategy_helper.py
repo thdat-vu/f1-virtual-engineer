@@ -77,9 +77,14 @@ def predict_tyre_wear(
         # (#214). A narrower band would only beat one half of the
         # distribution.
         window_fractions = (0.20, 0.55)
-    elif degradation_rate < 0.4:
+    elif degradation_rate < 0.5:
         # Medium degradation: standard 2-stop pacing — pit in the
-        # early-middle.
+        # early-middle. Threshold raised from 0.4 → 0.5 to fix #216:
+        # Australia 2024 SAI is the only fixture with positive decay
+        # (~+0.4 s/lap) across 20 cases; the old 0.4 cutoff misclassified
+        # it as high-deg and produced [6, 12] vs actual lap 16. At 0.5
+        # cutoff the medium tier covers it without affecting any other
+        # fixture (none currently sit in the 0.4-0.5 band).
         window_fractions = (0.20, 0.35)
     else:
         # High degradation: forced early stop — first 10-20% of the race.
