@@ -1,17 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
+import { EvalArcSection } from "@/components/landing/EvalArcSection";
 import { LandingCTA } from "@/components/landing/LandingCTA";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { TeamSwitcher } from "@/components/landing/TeamSwitcher";
 import { Footer } from "@/components/Footer";
+import { readEvalStatus } from "@/lib/eval-status";
 
 const navItems = [
+  { label: "How it works", href: "#eval-arc" },
   { label: "Capabilities", href: "#capabilities" },
   { label: "Mission Control", href: "/mission-control" },
 ];
 
 export default function Home() {
+  // Server Component — runs at build time. The reader uses node:fs and
+  // never reaches the client bundle. See frontend/src/lib/eval-status.ts.
+  const evalStatus = readEvalStatus();
+
   return (
     <main id="top" className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="hero-glow pointer-events-none fixed inset-0 opacity-60" />
@@ -59,7 +66,9 @@ export default function Home() {
       </header>
 
       <div className="relative z-10 mx-auto max-w-6xl px-6">
-        <LandingHero />
+        <LandingHero evalStatus={evalStatus} />
+
+        <EvalArcSection evalStatus={evalStatus} />
 
         <section id="capabilities" className="py-20">
           <div className="mb-10">

@@ -44,14 +44,17 @@ from evals.cases.strategy_pit_fixtures import FIXTURES
 
 PIT_LAP_TOLERANCE = 2
 
-# Threshold for snapshot-mode CI gate. The current live baseline is
-# 23/25 after #227 (added 5 finished 2026 races: AU, CN, JP, MIA, CAN).
-# All 5 new fixtures PASS without heuristic retuning — the 2024-tuned
-# tier thresholds generalize to 2026 cars at this scale. Threshold
-# matches the baseline so any drop trips CI. Bump manually when the
-# heuristic genuinely improves AND the snapshot is regenerated — keep
-# the numbers in lockstep.
-SNAPSHOT_PASS_THRESHOLD = 23
+# Snapshot-mode CI gate is sourced from a shared JSON file so the
+# landing page can render the same number without drift. Bump the
+# JSON when the heuristic genuinely improves AND the groundtruth
+# snapshot is regenerated — keep the numbers in lockstep.
+STATUS_PATH = (
+    _BACKEND_DIR / "evals" / "cases" / "strategy_pit_status.json"
+)
+with STATUS_PATH.open() as _f:
+    _STATUS = json.load(_f)
+SNAPSHOT_PASS_THRESHOLD = int(_STATUS["passing"])
+SNAPSHOT_TOTAL = int(_STATUS["total"])
 
 GROUNDTRUTH_PATH = (
     _BACKEND_DIR / "evals" / "cases" / "strategy_pit_groundtruth.json"
@@ -212,6 +215,17 @@ class StrategyPitAccuracyTests(unittest.TestCase):
             "Either fix the heuristic or — if the change is intentional and "
             "you've regenerated the snapshot — bump SNAPSHOT_PASS_THRESHOLD.",
         )
+
+
+class StrategyPitStatusShapeTests(unittest.TestCase):
+    """Guards the JSON contract that backend tests + the landing page share."""
+
+    def test_status_json_shape(self):
+        self.assertIsInstance(SNAPSHOT_PASS_THRESHOLD, int)
+        self.assertIsInstance(SNAPSHOT_TOTAL, int)
+        self.assertGreater(SNAPSHOT_TOTAL, 0)
+        self.assertLessEqual(SNAPSHOT_PASS_THRESHOLD, SNAPSHOT_TOTAL)
+        self.assertIsInstance(_STATUS.get("last_updated"), str)
 
 
 if __name__ == "__main__":

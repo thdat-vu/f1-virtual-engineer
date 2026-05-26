@@ -2,19 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-
-const heroStats = [
-  { label: "Live telemetry channels", value: "04" },
-  { label: "Strategy modules",        value: "03" },
-  { label: "Decision latency",        value: "<5s" },
-];
-
-const strategyMetrics = [
-  { label: "Tyre delta",    value: "+0.31s/lap" },
-  { label: "Undercut risk", value: "High" },
-  { label: "Traffic loss",  value: "1.8s" },
-  { label: "Confidence",    value: "74%" },
-];
+import type { EvalStatus } from "@/lib/eval-status";
 
 function FadeUp({
   delay = 0,
@@ -37,7 +25,13 @@ function FadeUp({
   );
 }
 
-export function LandingHero() {
+export function LandingHero({ evalStatus }: { evalStatus: EvalStatus }) {
+  const heroStats = [
+    { label: "Eval pass rate",       value: `${evalStatus.percent}%`,                     hint: "snapshot CI gate" },
+    { label: "Fixtures passing",     value: `${evalStatus.passing}/${evalStatus.total}`,  hint: "real F1 races" },
+    { label: "Decision latency",     value: "<5s",                                        hint: "telemetry → call" },
+  ];
+
   return (
     <section className="relative overflow-hidden pt-16 pb-20">
       <div className="hero-grid pointer-events-none absolute inset-0 opacity-40" />
@@ -52,20 +46,27 @@ export function LandingHero() {
 
           <FadeUp delay={0.08}>
             <h1 className="display mb-6 text-[length:var(--text-display)] leading-[0.95] text-foreground">
-              Build faster race calls from telemetry, not guesswork.
+              Every pit call, cited.
             </h1>
           </FadeUp>
 
           <FadeUp delay={0.16}>
             <p className="mb-10 max-w-xl text-[length:var(--text-body)] leading-7 text-foreground-dim">
-              Turn Formula 1 session data into explainable pit-window,
-              tyre-decay, and undercut insight — built for solo devs demoing real agentic AI.
+              A multi-agent F1 race engineer that reads telemetry, weighs regulations, and explains its
+              calls. <span className="text-foreground">{evalStatus.passing}/{evalStatus.total}</span> fixtures
+              passing, every recommendation cited — built up from a 40% baseline.
             </p>
           </FadeUp>
 
-          <FadeUp delay={0.22}>
+          <FadeUp delay={0.22} className="flex flex-wrap items-center gap-3">
             <Link href="/mission-control" className="btn btn--invert">
               Enter Mission Control →
+            </Link>
+            <Link
+              href="#eval-arc"
+              className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim transition-colors hover:text-foreground"
+            >
+              See how →
             </Link>
           </FadeUp>
 
@@ -74,6 +75,7 @@ export function LandingHero() {
               <FadeUp key={s.label} delay={0.3 + i * 0.08} className="divider pt-4">
                 <p className="display mb-1 text-[length:var(--text-h2)] text-foreground">{s.value}</p>
                 <p className="label">{s.label}</p>
+                <p className="readout mt-1 text-[length:var(--text-readout)] text-foreground-faint">{s.hint}</p>
               </FadeUp>
             ))}
           </div>
@@ -94,7 +96,7 @@ export function LandingHero() {
               </p>
             </div>
             <span className="readout border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[0.55rem] uppercase tracking-[var(--track-wide)] text-emerald-400">
-              Signal stable
+              Cited · 3 sources
             </span>
           </div>
 
@@ -113,7 +115,12 @@ export function LandingHero() {
           </motion.div>
 
           <div className="grid grid-cols-2 gap-3">
-            {strategyMetrics.map(({ label, value }, i) => (
+            {[
+              { label: "Tyre delta",    value: "+0.31s/lap" },
+              { label: "Undercut risk", value: "High" },
+              { label: "Traffic loss",  value: "1.8s" },
+              { label: "Confidence",    value: "74%" },
+            ].map(({ label, value }, i) => (
               <motion.div
                 key={label}
                 initial={{ opacity: 0 }}
