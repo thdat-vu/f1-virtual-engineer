@@ -1,6 +1,6 @@
 ---
 name: f1-eval-gate
-description: Use when changing strategy/tyre/pit-window heuristics or thresholds in `backend/tools/strategy_helper.py`, `backend/tools/tyre_helper.py`, or any code path the snapshot test exercises. Codifies the eval-driven loop: regenerate fixtures → run snapshot mode → adjust `strategy_pit_status.json` only if the heuristic genuinely improved AND the snapshot is regenerated.
+description: "Use when changing strategy/tyre/pit-window heuristics or thresholds in `backend/tools/strategy_helper.py`, `backend/tools/tyre_helper.py`, or any code path the snapshot test exercises. Codifies the eval-driven loop — regenerate fixtures, run snapshot mode, adjust `strategy_pit_status.json` only if the heuristic genuinely improved AND the snapshot is regenerated."
 ---
 
 # F1 Eval Gate

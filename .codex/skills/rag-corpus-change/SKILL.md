@@ -1,6 +1,6 @@
 ---
 name: rag-corpus-change
-description: Use when adding, removing, or substantially editing markdown notes under `backend/rag/corpus/`, or when changing the citation retrieval path in `backend/tools/knowledge_retriever.py` / `backend/agents/race_engineer.py`. Codifies the regression check learned from #238: generic year/race vocabulary in new notes can outscore topical strategy notes at low `k`, breaking the citation contract for natural-language pit questions.
+description: "Use when adding, removing, or substantially editing markdown notes under `backend/rag/corpus/`, or when changing the citation retrieval path in `backend/tools/knowledge_retriever.py` / `backend/agents/race_engineer.py`. Codifies the regression check learned from #238 — generic year/race vocabulary in new notes can outscore topical strategy notes at low `k`, breaking the citation contract for natural-language pit questions."
 ---
 
 # RAG Corpus Change
