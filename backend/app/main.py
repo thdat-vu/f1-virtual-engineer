@@ -33,6 +33,7 @@ from app.schemas.lap_delta_cross_year import (
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from app.schemas.tyre import TyreAnalyzeRequest, TyreAnalyzeResponse
+from app.schemas.weather import WeatherSummaryRequest, WeatherSummaryResponse
 from core.auth import get_optional_user_id, get_required_user_id
 from core.persistence import (
     delete_saved_query,
@@ -61,6 +62,7 @@ from tools.lap_delta import compute_lap_delta
 from tools.lap_delta_cross_year import compute_cross_year_lap_delta
 from tools.strategy_compare import compare_scenarios as compare_strategy_scenarios
 from tools.tyre_helper import compute_tyre_decay
+from tools.weather_helper import get_weather_summary
 
 
 _logger = logging.getLogger(__name__)
@@ -667,6 +669,37 @@ async def analyze_tyre(
     return TyreAnalyzeResponse(
         status="error" if snapshot.get("fallback") else "success",
         **snapshot,
+    )
+
+
+@app.post(
+    "/weather",
+    response_model=WeatherSummaryResponse,
+    tags=["telemetry"],
+    summary="Per-session weather summary (#235)",
+    description=(
+        "Aggregates FastF1 `session.weather_data` into a compact envelope: "
+        "condition (DRY/MIXED/WET derived from rainfall fraction), mean air + "
+        "track temp, humidity, wind. Frontend uses this to render a header "
+        "weather pill and to flag mismatched conditions in cross-year "
+        "comparisons. Fail-closed — any FastF1 hiccup degrades to a populated "
+        "envelope with `fallback: true` rather than 5xx."
+    ),
+)
+@limiter.limit("30/10seconds")
+async def weather_summary(
+    request: Request,
+    body: WeatherSummaryRequest,
+):
+    payload = await asyncio.to_thread(
+        get_weather_summary,
+        year=body.year,
+        event=body.event,
+        session_type=body.session_type,
+    )
+    return WeatherSummaryResponse(
+        status="error" if payload.get("fallback") else "success",
+        **payload,
     )
 
 

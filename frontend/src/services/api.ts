@@ -650,6 +650,44 @@ export async function analyzeTyre(
   return (await response.json()) as TyreAnalyzeResponse;
 }
 
+// ─── Weather (#235) ───────────────────────────────────────────────────
+// Per-session weather aggregate. Drives the header pill and the cross-
+// year mismatch badge. Same fail-closed contract: condition=null +
+// fallback_reason populated when FastF1 has no weather samples.
+
+export interface WeatherSummaryRequest {
+  year: number;
+  event: string;
+  session_type: string;
+}
+
+export interface WeatherSummaryResponse {
+  status: "success" | "error";
+  condition: "DRY" | "MIXED" | "WET" | null;
+  air_temp_c: number | null;
+  track_temp_c: number | null;
+  rainfall_fraction: number | null;
+  humidity_pct: number | null;
+  wind_speed_kmh: number | null;
+  fallback: boolean;
+  fallback_reason?: string | null;
+}
+
+export async function getWeatherSummary(
+  payload: WeatherSummaryRequest,
+): Promise<WeatherSummaryResponse> {
+  const response = await fetch(`${apiBaseUrl}/weather`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 429) throw await readRateLimit(response);
+  if (!response.ok) {
+    throw new Error(`Weather request failed with status ${response.status}`);
+  }
+  return (await response.json()) as WeatherSummaryResponse;
+}
+
 // ─── Lap Delta (#184) ─────────────────────────────────────────────────
 // Per-distance Δt between two drivers' fastest laps. Positive values
 // mean compare_driver was behind at that point on the lap. Same fail-

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { analyzeTelemetry, getCrossYearLapDelta, getEventDrivers, getEventLaps, getEventsByYear, getLapDelta, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapDeltaCrossYearResponse, LapDeltaResponse, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
+import { analyzeTelemetry, getCrossYearLapDelta, getEventDrivers, getEventLaps, getEventsByYear, getLapDelta, getTelemetry, getWeatherSummary, RateLimitError } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapDeltaCrossYearResponse, LapDeltaResponse, LapInfo, SavedQueryItem, TelemetryHistoryItem, WeatherSummaryResponse } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
@@ -60,6 +60,13 @@ export default function MissionControlPage() {
   // react-hooks/set-state-in-effect rule.
   const [lapDelta, setLapDelta] = useState<LapDeltaResponse | null>(null);
 
+  // Issue #235: per-session weather summary. Drives the header pill.
+  // Refetches whenever year/event/session changes — same dependency
+  // surface as the lap roster fetch below. Cross-year mismatch badge
+  // is deferred to a follow-up PR once #229 merges; this slice ships
+  // just the single-session pill.
+  const [weather, setWeather] = useState<WeatherSummaryResponse | null>(null);
+
   // Issue #182: explicit intent toggle. Default "telemetry" preserves the
   // legacy fastest-lap compare behavior; "strategy" routes the analyze
   // query through the regex classifier into strategy_analyzer so the Pit
@@ -86,6 +93,21 @@ export default function MissionControlPage() {
       .finally(() => { if (!cancelled) setEventsLoading(false); });
     return () => { cancelled = true; };
   }, [year]);
+
+  // Issue #235: weather fetch. Same fail-closed envelope as the rest;
+  // we keep the previous payload on error so a transient blip doesn't
+  // make the pill flicker. The `WeatherPill` component itself hides on
+  // fallback, so a never-populated state simply renders nothing.
+  useEffect(() => {
+    if (!eventName) {
+      return;
+    }
+    let cancelled = false;
+    getWeatherSummary({ year, event: eventName, session_type: session })
+      .then((res) => { if (!cancelled) setWeather(res); })
+      .catch(() => { /* keep last good payload */ });
+    return () => { cancelled = true; };
+  }, [year, eventName, session]);
 
   // Live driver roster; falls back to static list if backend has none yet.
   useEffect(() => {
@@ -381,7 +403,7 @@ export default function MissionControlPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <MissionHeader
           displayDriver={displayDriver} displayEvent={displayEvent} displayLap={displayLap}
-          theme={theme} setTheme={setTheme}
+          theme={theme} setTheme={setTheme} weather={weather}
         />
 
         <SelectorBar

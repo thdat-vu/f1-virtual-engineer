@@ -2,16 +2,19 @@
 
 import { TeamIcon } from "@/components/icons/TeamIcons";
 import { AuthButton } from "@/components/auth/AuthButton";
+import type { WeatherSummaryResponse } from "@/services/api";
 import { TEAMS, type TeamId } from "./constants";
+import { WeatherPill } from "./WeatherPill";
 
 export function MissionHeader({
-  displayDriver, displayEvent, displayLap, theme, setTheme,
+  displayDriver, displayEvent, displayLap, theme, setTheme, weather,
 }: {
   displayDriver: string;
   displayEvent: string;
   displayLap: string | null;
   theme: TeamId;
   setTheme: (id: TeamId) => void;
+  weather: WeatherSummaryResponse | null;
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-5">
@@ -20,6 +23,7 @@ export function MissionHeader({
       <span className="readout shrink-0 text-[length:var(--text-readout)] text-foreground-dim">
         {displayDriver} {"//"} {displayEvent}{displayLap ? ` // ${displayLap}` : ""}
       </span>
+      <WeatherPill weather={weather} />
       <div className="flex-1" />
 
       <AuthButton />
