@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { analyzeTelemetry, getEventDrivers, getEventLaps, getEventsByYear, getLapDelta, getTelemetry, RateLimitError } from "@/services/api";
-import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapDeltaResponse, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
+import { analyzeTelemetry, getCrossYearLapDelta, getEventDrivers, getEventLaps, getEventsByYear, getLapDelta, getTelemetry, RateLimitError } from "@/services/api";
+import type { AnalyzeHistoryItem, AnalyzeResponse, EventInfo, LapDeltaCrossYearResponse, LapDeltaResponse, LapInfo, SavedQueryItem, TelemetryHistoryItem } from "@/services/api";
 import { useMissionStore } from "@/lib/store";
 import { useSupabase } from "@/components/auth/SupabaseProvider";
 import {
@@ -46,6 +46,13 @@ export default function MissionControlPage() {
   const [compareDriver, setCompareDriver]             = useState<string>("");
   const [compareSpeedSeries, setCompareSpeedSeries]   = useState<number[] | null>(null);
   const [compareLoading, setCompareLoading]           = useState(false);
+
+  // Issue #229: cross-year mode. Compares the SAME driver's fastest lap
+  // at this event in `compareYear` vs the currently selected `year`.
+  // Mutually exclusive with compareDriver — the same chart slot can't
+  // host two different "vs" semantics without confusing the colours.
+  const [compareYear, setCompareYear] = useState<number | null>(null);
+  const [crossYearDelta, setCrossYearDelta] = useState<LapDeltaCrossYearResponse | null>(null);
 
   // Issue #184: per-distance Δt(reference vs compare). Loading state is
   // derived in the chart from "compareDriver set but no payload" — no
@@ -185,6 +192,25 @@ export default function MissionControlPage() {
       .catch(() => { if (!cancelled) setLapDelta(null); });
     return () => { cancelled = true; };
   }, [driver, compareDriver, year, eventName, session]);
+
+  // Issue #229: cross-year fetch. Mirrors the lap-delta effect — fires
+  // only when both years and a driver are pinned and the years differ.
+  // Stays parked in its own effect so the two compare modes don't
+  // share state and accidentally render half-stale chart data.
+  useEffect(() => {
+    if (!compareYear || !driver || !eventName || compareYear === year) return;
+    let cancelled = false;
+    getCrossYearLapDelta({
+      event: eventName,
+      session_type: session,
+      driver,
+      year_a: compareYear,
+      year_b: year,
+    })
+      .then((res) => { if (!cancelled) setCrossYearDelta(res); })
+      .catch(() => { if (!cancelled) setCrossYearDelta(null); });
+    return () => { cancelled = true; };
+  }, [compareYear, driver, eventName, session, year]);
 
   const canRun = !isLoading && !!eventName && !!driver;
 
@@ -329,6 +355,18 @@ export default function MissionControlPage() {
     ),
   );
 
+  // Same derivation pattern for cross-year (#229) — request is in
+  // flight when years differ but the latest payload doesn't yet
+  // describe (driver, year_a=compareYear, year_b=year).
+  const crossYearLoading = Boolean(
+    compareYear && driver && compareYear !== year && (
+      !crossYearDelta ||
+      crossYearDelta.driver !== driver ||
+      crossYearDelta.year_a !== compareYear ||
+      crossYearDelta.year_b !== year
+    ),
+  );
+
   const displayDriver = result?.intent?.driver ?? driver ?? "—";
   const displayEvent  = result?.intent?.event  ?? eventName ?? "—";
   const displayLap =
@@ -361,6 +399,8 @@ export default function MissionControlPage() {
           compareDriver={compareDriver} setCompareDriver={setCompareDriver}
           compareLoading={compareLoading}
           setCompareSpeedSeries={setCompareSpeedSeries} setCompareLoading={setCompareLoading}
+          compareYear={compareYear} setCompareYear={setCompareYear}
+          setCrossYearDelta={setCrossYearDelta}
           intent={intent} setIntent={setIntent}
           result={result} isLoading={isLoading} canRun={canRun} onAnalyze={handleAnalyze}
           savedQueries={savedQueries} onSavedQueriesChange={setSavedQueries}
@@ -370,6 +410,8 @@ export default function MissionControlPage() {
           tel={tel} isLoading={isLoading} hasData={hasData} animateKey={animKey}
           compareDriver={compareDriver} compareSpeedSeries={compareSpeedSeries}
           driver={driver} lapDelta={lapDelta} lapDeltaLoading={lapDeltaLoading}
+          year={year} compareYear={compareYear}
+          crossYearDelta={crossYearDelta} crossYearLoading={crossYearLoading}
         />
 
         <MissionFooter tel={tel} strat={strat} hasData={hasData} execution={result?.execution} />

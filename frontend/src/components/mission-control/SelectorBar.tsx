@@ -16,6 +16,7 @@ export function SelectorBar({
   setLaps, setFastestLapNumber, setLapsLoading, setLapOverlayLoading,
   compareDriver, setCompareDriver, compareLoading,
   setCompareSpeedSeries, setCompareLoading,
+  compareYear, setCompareYear, setCrossYearDelta,
   intent, setIntent,
   result, isLoading, canRun, onAnalyze,
   savedQueries, onSavedQueriesChange,
@@ -51,6 +52,9 @@ export function SelectorBar({
   compareLoading: boolean;
   setCompareSpeedSeries: (v: number[] | null) => void;
   setCompareLoading: (v: boolean) => void;
+  compareYear: number | null;
+  setCompareYear: (n: number | null) => void;
+  setCrossYearDelta: (v: null) => void;
   intent: "telemetry" | "strategy";
   setIntent: (v: "telemetry" | "strategy") => void;
   result: AnalyzeResponse | null;
@@ -66,6 +70,9 @@ export function SelectorBar({
   const compareDriverOptions = drivers
     .filter((d) => d !== driver)
     .map((d) => ({ id: d, label: d }));
+  const compareYearOptions = f1Seasons()
+    .filter((y) => y !== year)
+    .map((y) => ({ id: String(y), label: String(y) }));
   const lapOptions = laps.map((l) => {
     const lapTime = l.lap_time_seconds != null ? formatLapTime(l.lap_time_seconds) : null;
     const tag =
@@ -92,6 +99,11 @@ export function SelectorBar({
             setFastestLapNumber(null);
             setCompareDriver("");
             setCompareSpeedSeries(null);
+            // Cross-year (#229): clear when the base year changes — the
+            // previously-picked compareYear may now collide with `year`,
+            // and a stale payload would render against the wrong axis.
+            setCompareYear(null);
+            setCrossYearDelta(null);
           }}
           options={f1Seasons().map((y) => ({ id: String(y), label: String(y) }))}
           placeholder="Year"
@@ -179,12 +191,35 @@ export function SelectorBar({
           value={compareDriver}
           onChange={(v) => {
             setCompareDriver(v);
-            if (v) setCompareLoading(true);
-            else setCompareSpeedSeries(null);
+            if (v) {
+              setCompareLoading(true);
+              // Mutually exclusive with cross-year (#229): the LapDelta
+              // chart slot can only host one "vs" semantics at a time.
+              setCompareYear(null);
+              setCrossYearDelta(null);
+            } else setCompareSpeedSeries(null);
           }}
           options={compareDriverOptions}
           loading={compareLoading}
           placeholder="vs Driver"
+        />
+
+        <VDivider />
+
+        <Select<string>
+          value={compareYear ? String(compareYear) : ""}
+          onChange={(v) => {
+            const next = v ? Number(v) : null;
+            setCompareYear(next);
+            if (next) {
+              setCompareDriver("");
+              setCompareSpeedSeries(null);
+            } else {
+              setCrossYearDelta(null);
+            }
+          }}
+          options={compareYearOptions}
+          placeholder="vs Year"
         />
       </div>
 

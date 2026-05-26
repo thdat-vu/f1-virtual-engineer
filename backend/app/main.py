@@ -26,6 +26,10 @@ from app.schemas.knowledge import (
 )
 from app.schemas.strategy_compare import StrategyCompareRequest, StrategyCompareResponse
 from app.schemas.lap_delta import LapDeltaRequest, LapDeltaResponse
+from app.schemas.lap_delta_cross_year import (
+    LapDeltaCrossYearRequest,
+    LapDeltaCrossYearResponse,
+)
 from app.schemas.schedule import LapListResponse, RosterResponse, ScheduleResponse
 from app.schemas.telemetry import ApiError, TelemetryQueryRequest, TelemetryResponse, TelemetrySummary
 from app.schemas.tyre import TyreAnalyzeRequest, TyreAnalyzeResponse
@@ -54,6 +58,7 @@ from tools.fastf1_helper import (
 )
 from tools.knowledge_retriever import get_note as knowledge_get_note, lookup as knowledge_lookup
 from tools.lap_delta import compute_lap_delta
+from tools.lap_delta_cross_year import compute_cross_year_lap_delta
 from tools.strategy_compare import compare_scenarios as compare_strategy_scenarios
 from tools.tyre_helper import compute_tyre_decay
 
@@ -724,6 +729,38 @@ async def lap_delta(request: Request, body: LapDeltaRequest):
         compare_lap=body.compare_lap,
     )
     return LapDeltaResponse(
+        status="error" if payload.get("fallback") else "success",
+        **payload,
+    )
+
+
+@app.post(
+    "/lap-delta-cross-year",
+    response_model=LapDeltaCrossYearResponse,
+    tags=["telemetry"],
+    summary="Per-distance Δt of one driver's fastest laps across two seasons",
+    description=(
+        "Loads two sessions (same event, different years) and aligns the "
+        "driver's fastest lap from each on Distance. Δt at each metre tells "
+        "the story of what changed between car generations. Positive ⇒ "
+        "year_b was slower there; older car was faster on that section. "
+        "Same fail-closed envelope as /lap-delta. (#229)"
+    ),
+)
+@limiter.limit("10/10seconds")
+async def lap_delta_cross_year(
+    request: Request,
+    body: LapDeltaCrossYearRequest,
+):
+    payload = await asyncio.to_thread(
+        compute_cross_year_lap_delta,
+        event=body.event,
+        session_type=body.session_type,
+        driver=body.driver,
+        year_a=body.year_a,
+        year_b=body.year_b,
+    )
+    return LapDeltaCrossYearResponse(
         status="error" if payload.get("fallback") else "success",
         **payload,
     )

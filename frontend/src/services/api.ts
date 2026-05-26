@@ -693,6 +693,49 @@ export async function getLapDelta(
   return (await response.json()) as LapDeltaResponse;
 }
 
+// ─── Lap Delta — cross-year (#229) ────────────────────────────────────
+// Same fail-closed envelope as /lap-delta; the question is different —
+// one driver, one event, two seasons. Distance grid stops at the
+// shorter lap so layout edits don't extrapolate.
+
+export interface LapDeltaCrossYearRequest {
+  event: string;
+  session_type: string;
+  driver: string;
+  year_a: number;
+  year_b: number;
+}
+
+export interface LapDeltaCrossYearResponse {
+  status: "success" | "error";
+  distance_m: number[];
+  delta_seconds: number[];
+  driver: string | null;
+  year_a: number | null;
+  year_b: number | null;
+  lap_a: number | null;
+  lap_b: number | null;
+  lap_time_a_seconds: number | null;
+  lap_time_b_seconds: number | null;
+  fallback: boolean;
+  fallback_reason?: string | null;
+}
+
+export async function getCrossYearLapDelta(
+  payload: LapDeltaCrossYearRequest,
+): Promise<LapDeltaCrossYearResponse> {
+  const response = await fetch(`${apiBaseUrl}/lap-delta-cross-year`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 429) throw await readRateLimit(response);
+  if (!response.ok) {
+    throw new Error(`Cross-year lap delta request failed with status ${response.status}`);
+  }
+  return (await response.json()) as LapDeltaCrossYearResponse;
+}
+
 export interface KnowledgeNote {
   id: string;
   title: string;
@@ -724,6 +767,34 @@ export async function getKnowledgeNote(
     return payload.note;
   } catch {
     return null;
+  }
+}
+
+export interface KnowledgeLookupResponse {
+  status: "success" | "error";
+  query: string;
+  citations: KnowledgeCitation[];
+  error?: string | null;
+}
+
+export async function lookupKnowledge(
+  query: string,
+  k = 3,
+): Promise<KnowledgeCitation[]> {
+  // Used by the cross-year chart (#229) to fetch relevant car-generation
+  // / regulation notes based on (year_a, year_b). Best-effort — a network
+  // hiccup here just hides the chip rather than blocking the chart.
+  try {
+    const response = await fetch(`${apiBaseUrl}/knowledge/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, k }),
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as KnowledgeLookupResponse;
+    return payload.citations ?? [];
+  } catch {
+    return [];
   }
 }
 
