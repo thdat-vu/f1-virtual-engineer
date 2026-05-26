@@ -87,6 +87,15 @@ Also verify:
 
 If the change affects telemetry or strategy behavior, also use `f1-strategy-self-qa`.
 
+If the diff touches strategy/tyre/pit-window heuristics or any code path the
+snapshot test exercises, also use `f1-eval-gate` — it codifies the
+"regenerate fixtures → run snapshot → only bump `strategy_pit_status.json`
+when the heuristic genuinely improves" loop.
+
+If the diff adds, removes, or substantially edits markdown notes under
+`backend/rag/corpus/`, or touches the citation retrieval path, also use
+`rag-corpus-change` to catch the BM25 regression pattern from #238.
+
 ### 7. Commit cleanly
 
 Use Conventional Commits with repo scopes:

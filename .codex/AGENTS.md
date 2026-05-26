@@ -51,6 +51,8 @@ If the GitHub MCP server is configured but not authenticated in the current Code
 | `issue-to-pr` | asked to implement an issue/task end-to-end |
 | `f1-data-research` | changing FastF1 usage, telemetry assumptions, strategy logic, or F1 domain mapping |
 | `f1-strategy-self-qa` | validating telemetry/strategy/API/UI behavior before commit or PR |
+| `f1-eval-gate` | changing strategy/tyre/pit-window heuristics — gates `strategy_pit_status.json` updates |
+| `rag-corpus-change` | adding/editing markdown notes under `backend/rag/corpus/` or the citation retrieval path |
 | `indie-hacker-slice` | reducing large ideas into an MVP-sized slice |
 
 ## Required workflow
