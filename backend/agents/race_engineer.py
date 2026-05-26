@@ -541,7 +541,13 @@ def analyze_query(
     #      strategy question is enough to surface the right note.
     if KNOWLEDGE_PATTERN.search(query or "") or STRATEGY_PATTERN.search(query or ""):
         try:
-            citations = knowledge_lookup(query, 2) or []
+            # k=3 (was 2): once the corpus expanded past ~20 notes (#236),
+            # generic year/race vocabulary in cross-year notes occasionally
+            # outscored a topical strategy note for natural-language pit
+            # questions ("should HAM undercut at japan 2023 race"). Three
+            # hits restores the headroom for the strategy note to land
+            # without re-tuning BM25 weights.
+            citations = knowledge_lookup(query, 3) or []
         except Exception:  # noqa: BLE001 — retrieval must never break /analyze
             citations = []
     try:
