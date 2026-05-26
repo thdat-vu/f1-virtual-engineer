@@ -4,6 +4,7 @@ import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
 import { LandingCTA } from "@/components/landing/LandingCTA";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { TeamSwitcher } from "@/components/landing/TeamSwitcher";
+import { Footer } from "@/components/Footer";
 
 const navItems = [
   { label: "Capabilities", href: "#capabilities" },
@@ -72,6 +73,7 @@ export default function Home() {
       </div>
 
       <LandingCTA />
+      <Footer />
     </main>
   );
 }
