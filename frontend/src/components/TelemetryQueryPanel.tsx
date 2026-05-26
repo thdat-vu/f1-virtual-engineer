@@ -14,6 +14,7 @@ import {
 import { ReactNode, useEffect, useMemo, useState } from "react";
 
 import { analyzeTelemetry, AnalyzeResponse, StrategyData, getEventsByYear, EventInfo } from "@/services/api";
+import { availableSeasons, defaultSeason } from "@/lib/f1-seasons";
 
 const DRIVER_OPTIONS = [
   { code: "VER", label: "Max Verstappen" },
@@ -38,7 +39,7 @@ const DRIVER_OPTIONS = [
   { code: "BEA", label: "Oliver Bearman" },
 ];
 
-const YEAR_OPTIONS = [2023, 2024, 2025];
+const YEAR_OPTIONS = availableSeasons();
 
 const SESSION_OPTIONS = [
   { value: "FP1", label: "Practice 1" },
@@ -55,7 +56,7 @@ export function TelemetryQueryPanel({
 }: TelemetryQueryPanelProps) {
   const [driver, setDriver] = useState("VER");
   const [eventName, setEventName] = useState("Japanese Grand Prix");
-  const [year, setYear] = useState(2023);
+  const [year, setYear] = useState(defaultSeason());
   const [sessionType, setSessionType] = useState("R");
   const [availableEvents, setAvailableEvents] = useState<EventInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);

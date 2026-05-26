@@ -13,7 +13,10 @@ export const TEAMS = [
 ] as const;
 export type TeamId = (typeof TEAMS)[number]["id"];
 
-export const YEARS = [2024, 2023, 2022, 2021, 2020, 2019, 2018] as const;
+// Year list now derives from the system clock (#225) — see lib/f1-seasons.ts.
+// Importers should call `availableSeasons()` directly so SSR vs CSR rendering
+// stays consistent with the user's clock at render time.
+export { availableSeasons as f1Seasons, defaultSeason } from "@/lib/f1-seasons";
 
 export const SESSIONS = [
   { id: "R",   label: "Race" },

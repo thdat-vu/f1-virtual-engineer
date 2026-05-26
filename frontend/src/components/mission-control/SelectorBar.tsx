@@ -1,7 +1,7 @@
 "use client";
 
 import type { AnalyzeResponse, EventInfo, LapInfo, SavedQueryItem } from "@/services/api";
-import { SESSIONS, YEARS, type SessionId } from "./constants";
+import { SESSIONS, f1Seasons, type SessionId } from "./constants";
 import { Select, VDivider } from "./primitives";
 import { formatLapTime } from "./TelemetryChart";
 import { StarButton } from "./StarButton";
@@ -93,7 +93,7 @@ export function SelectorBar({
             setCompareDriver("");
             setCompareSpeedSeries(null);
           }}
-          options={YEARS.map((y) => ({ id: String(y), label: String(y) }))}
+          options={f1Seasons().map((y) => ({ id: String(y), label: String(y) }))}
           placeholder="Year"
         />
         <VDivider />

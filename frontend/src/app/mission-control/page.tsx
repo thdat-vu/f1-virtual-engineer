@@ -9,6 +9,7 @@ import {
   FALLBACK_DRIVERS, MissionFooter, MissionHeader, NavRail,
   SelectorBar, StrategyHUD, TelemetryChartGrid, type SessionId,
 } from "@/components/mission-control";
+import { defaultSeason } from "@/lib/f1-seasons";
 
 export default function MissionControlPage() {
   const { theme, setTheme, result, setResult, isLoading, setIsLoading } = useMissionStore();
@@ -18,7 +19,7 @@ export default function MissionControlPage() {
   const [radioHistoryRefreshSignal] = useState(0);
   const [savedQueries, setSavedQueries] = useState<SavedQueryItem[]>([]);
 
-  const [year, setYear]       = useState<number>(2024);
+  const [year, setYear]       = useState<number>(defaultSeason());
   const [eventName, setEvent] = useState<string>("");
   const [session, setSession] = useState<SessionId>("R");
   const [driver, setDriver]   = useState<string>("");
