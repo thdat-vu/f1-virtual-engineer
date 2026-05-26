@@ -161,4 +161,42 @@ FIXTURES: list[dict[str, Any]] = [
         "session_type": "R",
         "driver": "VER",
     },
+    # 2026 current-season expansion (#227). Winners only — race winner =
+    # the strategic call that actually worked, cleanest first-stop signal.
+    # Five races finished as of 2026-05-26: AU, CN, JP, MIA, CAN.
+    {
+        "id": "2026-australia-r-rus",
+        "year": 2026,
+        "event": "Australian Grand Prix",
+        "session_type": "R",
+        "driver": "RUS",
+    },
+    {
+        "id": "2026-china-r-ant",
+        "year": 2026,
+        "event": "Chinese Grand Prix",
+        "session_type": "R",
+        "driver": "ANT",
+    },
+    {
+        "id": "2026-japan-r-ant",
+        "year": 2026,
+        "event": "Japanese Grand Prix",
+        "session_type": "R",
+        "driver": "ANT",
+    },
+    {
+        "id": "2026-miami-r-ant",
+        "year": 2026,
+        "event": "Miami Grand Prix",
+        "session_type": "R",
+        "driver": "ANT",
+    },
+    {
+        "id": "2026-canada-r-ant",
+        "year": 2026,
+        "event": "Canadian Grand Prix",
+        "session_type": "R",
+        "driver": "ANT",
+    },
 ]

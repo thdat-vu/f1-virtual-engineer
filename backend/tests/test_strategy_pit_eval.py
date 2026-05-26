@@ -45,11 +45,13 @@ from evals.cases.strategy_pit_fixtures import FIXTURES
 PIT_LAP_TOLERANCE = 2
 
 # Threshold for snapshot-mode CI gate. The current live baseline is
-# 18/20 after #216 (high-deg cutoff bumped 0.4 → 0.5 to reclassify
-# Australia 2024 SAI). The threshold matches the baseline so any drop
-# trips CI. Bump manually when the heuristic genuinely improves AND
-# the snapshot is regenerated — keep the numbers in lockstep.
-SNAPSHOT_PASS_THRESHOLD = 18
+# 23/25 after #227 (added 5 finished 2026 races: AU, CN, JP, MIA, CAN).
+# All 5 new fixtures PASS without heuristic retuning — the 2024-tuned
+# tier thresholds generalize to 2026 cars at this scale. Threshold
+# matches the baseline so any drop trips CI. Bump manually when the
+# heuristic genuinely improves AND the snapshot is regenerated — keep
+# the numbers in lockstep.
+SNAPSHOT_PASS_THRESHOLD = 23
 
 GROUNDTRUTH_PATH = (
     _BACKEND_DIR / "evals" / "cases" / "strategy_pit_groundtruth.json"
