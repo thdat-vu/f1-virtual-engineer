@@ -315,17 +315,25 @@ def _normalize_telemetry(
 def get_year_schedule(year: int) -> list[dict[str, Any]]:
     """
     Fetch the event schedule for a specific year and return a list of event dictionaries.
+
+    Pre-season testing rounds are dropped (RoundNumber == 0). FastF1
+    can return multiple test sessions sharing the same EventName
+    ("Pre-Season Testing"), and the frontend keys its <option> list
+    on EventName — duplicates produce a React duplicate-key warning
+    and a non-uniquely-selectable dropdown. Testing sessions also
+    aren't useful targets for the strategy/lap-delta flows.
     """
     try:
         schedule = fastf1.get_event_schedule(year)
-        # Filter for official race events (Grand Prix) and testing if needed
-        # We'll return EventName and Location for the UI
         events = []
         for _, row in schedule.iterrows():
+            round_number = int(row["RoundNumber"])
+            if round_number == 0:
+                continue
             events.append({
                 "name": row["EventName"],
                 "location": row["Location"],
-                "round": int(row["RoundNumber"]),
+                "round": round_number,
                 "official_name": row["OfficialEventName"]
             })
         return events

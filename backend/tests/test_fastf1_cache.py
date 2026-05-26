@@ -62,6 +62,23 @@ class ScheduleCacheTests(unittest.TestCase):
         # 2024 yields [] which isn't cached, 2023 also []; both miss = 2 calls.
         self.assertEqual(mock_get.call_count, 2)
 
+    def test_pre_season_testing_rounds_dropped(self):
+        # FastF1 returns Pre-Season Testing rows with RoundNumber=0
+        # (sometimes multiple, sharing the EventName). The frontend
+        # keys its <option> list on EventName, so duplicates trigger
+        # a React duplicate-key warning. Filter them at the helper.
+        fake_schedule = MagicMock()
+        fake_schedule.iterrows.return_value = iter([
+            (0, {"EventName": "Pre-Season Testing", "Location": "Bahrain", "RoundNumber": 0, "OfficialEventName": "TEST 1"}),
+            (1, {"EventName": "Pre-Season Testing", "Location": "Bahrain", "RoundNumber": 0, "OfficialEventName": "TEST 2"}),
+            (2, {"EventName": "Bahrain GP", "Location": "Sakhir", "RoundNumber": 1, "OfficialEventName": "FORMULA 1 BAHRAIN GP"}),
+        ])
+        with patch.object(fastf1_helper.fastf1, "get_event_schedule", return_value=fake_schedule):
+            events = get_year_schedule(2026)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["name"], "Bahrain GP")
+        self.assertEqual(events[0]["round"], 1)
+
 
 class FallbackBypassTests(unittest.TestCase):
     """Helpers that return {"fallback": True, ...} on error must not cache it."""
