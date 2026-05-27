@@ -23,6 +23,12 @@ backend/.pytest_cache/
 backend/notebooks/
 backend/eval/
 backend/evals/
+# Re-include the strategy eval status JSON — frontend Docker build
+# reads it at `next build` time so the landing page renders the
+# same number CI enforces. Must be listed AFTER the `backend/evals/`
+# rule above for the un-ignore to take effect.
+!backend/evals/cases/
+!backend/evals/cases/strategy_pit_status.json
 backend/migrations/
 backend/scripts/
 backend/infra/
