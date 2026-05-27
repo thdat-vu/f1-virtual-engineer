@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { lookupKnowledge } from "@/services/api";
-import type { AnalyzeResponse, KnowledgeCitation, LapDeltaCrossYearResponse, LapDeltaResponse } from "@/services/api";
+import type { AnalyzeResponse, KnowledgeCitation, LapDeltaCrossYearResponse, LapDeltaResponse, WeatherSummaryResponse } from "@/services/api";
 import { LapDeltaChart } from "./LapDeltaChart";
 import { ReferencesPanel } from "./ReferencesPanel";
 import { TelemetryChart } from "./TelemetryChart";
 import { TimeAxis } from "./TimeAxis";
+import { WeatherMismatchBadge } from "./WeatherMismatchBadge";
 
 export function TelemetryChartGrid({
   tel, isLoading, hasData, animateKey, compareDriver, compareSpeedSeries,
   driver, lapDelta, lapDeltaLoading,
   year, compareYear, crossYearDelta, crossYearLoading,
+  weather, compareYearWeather,
 }: {
   tel: AnalyzeResponse["telemetry_data"] | undefined;
   isLoading: boolean;
@@ -26,6 +28,8 @@ export function TelemetryChartGrid({
   compareYear: number | null;
   crossYearDelta: LapDeltaCrossYearResponse | null;
   crossYearLoading: boolean;
+  weather: WeatherSummaryResponse | null;
+  compareYearWeather: WeatherSummaryResponse | null;
 }) {
   const lapDurationS = tel?.lap_duration_s ?? null;
   const sectorBoundariesS = tel?.sector_boundaries_s ?? [];
@@ -137,6 +141,14 @@ export function TelemetryChartGrid({
             fallback={Boolean(crossYearDelta?.fallback)}
             fallbackReason={crossYearDelta?.fallback_reason ?? null}
           />
+          {crossYearHasData && compareYear ? (
+            <WeatherMismatchBadge
+              yearA={year}
+              yearB={compareYear}
+              weatherA={weather}
+              weatherB={compareYearWeather}
+            />
+          ) : null}
           {crossYearHasData && crossYearCitations && crossYearCitations.length > 0 ? (
             <ReferencesPanel items={crossYearCitations} />
           ) : null}

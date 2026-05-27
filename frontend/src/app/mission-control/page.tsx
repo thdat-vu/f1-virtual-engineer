@@ -62,10 +62,13 @@ export default function MissionControlPage() {
 
   // Issue #235: per-session weather summary. Drives the header pill.
   // Refetches whenever year/event/session changes — same dependency
-  // surface as the lap roster fetch below. Cross-year mismatch badge
-  // is deferred to a follow-up PR once #229 merges; this slice ships
-  // just the single-session pill.
+  // surface as the lap roster fetch below.
   const [weather, setWeather] = useState<WeatherSummaryResponse | null>(null);
+
+  // Issue #242: cross-year weather mismatch. Second weather payload
+  // for `compareYear` so the badge can compare conditions across the
+  // two seasons. Stays null until cross-year mode is active.
+  const [compareYearWeather, setCompareYearWeather] = useState<WeatherSummaryResponse | null>(null);
 
   // Issue #182: explicit intent toggle. Default "telemetry" preserves the
   // legacy fastest-lap compare behavior; "strategy" routes the analyze
@@ -108,6 +111,23 @@ export default function MissionControlPage() {
       .catch(() => { /* keep last good payload */ });
     return () => { cancelled = true; };
   }, [year, eventName, session]);
+
+  // Issue #242: parallel fetch for `compareYear` so the mismatch badge
+  // has both summaries to compare. Same fail-closed envelope; the
+  // badge itself hides on either fallback so a transient miss just
+  // means no badge, not a half-rendered chip. We don't synchronously
+  // reset on cross-year-off — the badge gates on `compareYear` and
+  // crossYearHasData, so a stale payload can't surface.
+  useEffect(() => {
+    if (!eventName || !compareYear || compareYear === year) {
+      return;
+    }
+    let cancelled = false;
+    getWeatherSummary({ year: compareYear, event: eventName, session_type: session })
+      .then((res) => { if (!cancelled) setCompareYearWeather(res); })
+      .catch(() => { /* keep last good payload */ });
+    return () => { cancelled = true; };
+  }, [compareYear, eventName, session, year]);
 
   // Live driver roster; falls back to static list if backend has none yet.
   useEffect(() => {
@@ -434,6 +454,7 @@ export default function MissionControlPage() {
           driver={driver} lapDelta={lapDelta} lapDeltaLoading={lapDeltaLoading}
           year={year} compareYear={compareYear}
           crossYearDelta={crossYearDelta} crossYearLoading={crossYearLoading}
+          weather={weather} compareYearWeather={compareYearWeather}
         />
 
         <MissionFooter tel={tel} strat={strat} hasData={hasData} execution={result?.execution} />
