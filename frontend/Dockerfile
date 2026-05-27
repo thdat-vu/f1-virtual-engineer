@@ -18,6 +18,12 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend .
+# The landing page reads strategy_pit_status.json at build time so
+# the "92%" claim is sourced from the same JSON CI enforces. Build
+# context is the repo root (see .github/workflows/ci.yml), so this
+# COPY pulls from outside frontend/. Keep the destination aligned
+# with the candidate path in frontend/src/lib/eval-status.ts.
+COPY backend/evals/cases/strategy_pit_status.json ./public/data/strategy_pit_status.json
 ARG NEXT_PUBLIC_API_BASE_URL=/api
 ARG BACKEND_INTERNAL_URL=http://backend:8000
 # NEXT_PUBLIC_* must be present at `next build` time — Next inlines
