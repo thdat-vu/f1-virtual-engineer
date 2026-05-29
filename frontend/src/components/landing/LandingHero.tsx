@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { QuestionRotator } from "@/components/landing/QuestionRotator";
+import { JargonTooltip } from "@/components/ui/JargonTooltip";
 
 const DEMO_HREF =
   "/mission-control?event=Japanese%20Grand%20Prix&session=R&driver=VER&lap=fastest";
@@ -227,17 +228,17 @@ function LapDeltaPreview() {
   );
 }
 
-const ribbonItems = [
-  "SECTOR 1 +0.184",
-  "SECTOR 2 −0.092",
-  "TYRE MEDIUM",
-  "DRS ENABLED",
-  "PACE DELTA −0.31",
-  "PIT WINDOW LAP 18–22",
-  "UNDERCUT RISK HIGH",
-  "BATTERY DEPLOY PUSH",
-  "GAP TO LEADER 3.4s",
-  "STINT LENGTH 22 LAPS",
+const ribbonItems: Array<{ text: string; term?: string }> = [
+  { text: "SECTOR 1 +0.184", term: "sector" },
+  { text: "SECTOR 2 −0.092", term: "sector" },
+  { text: "TYRE MEDIUM" },
+  { text: "DRS ENABLED", term: "drs" },
+  { text: "PACE DELTA −0.31" },
+  { text: "PIT WINDOW LAP 18–22", term: "pit window" },
+  { text: "UNDERCUT RISK HIGH", term: "undercut" },
+  { text: "BATTERY DEPLOY PUSH" },
+  { text: "GAP TO LEADER 3.4s", term: "gap" },
+  { text: "STINT LENGTH 22 LAPS", term: "stint" },
 ];
 
 function TelemetryRibbon() {
@@ -249,7 +250,11 @@ function TelemetryRibbon() {
           <div key={idx} className="flex shrink-0 items-center gap-3">
             <span className="h-1 w-1 rounded-full bg-foreground-dim" />
             <span className="readout text-[length:var(--text-label)] uppercase tracking-[var(--track-wide)] text-foreground-dim">
-              {item}
+              {item.term ? (
+                <JargonTooltip term={item.term}>{item.text}</JargonTooltip>
+              ) : (
+                item.text
+              )}
             </span>
           </div>
         ))}

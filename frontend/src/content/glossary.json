@@ -1,0 +1,12 @@
+{
+  "drs": "Drag Reduction System — a rear-wing flap that opens on straights to reduce drag and aid overtaking.",
+  "undercut": "Pitting earlier than the car ahead so fresh tyres gain enough time to come out in front after they pit.",
+  "overcut": "Staying out longer than the car ahead, banking on cleaner air and tyre warm-up to gain the position when they pit.",
+  "tyre deg": "Tyre degradation — the gradual loss of grip and lap time as a tyre wears.",
+  "stint": "A continuous run on one set of tyres between pit stops.",
+  "pit window": "The lap range where pitting is strategically optimal given tyre life and traffic.",
+  "dirty air": "Turbulent airflow behind another car that reduces downforce and overheats tyres.",
+  "slipstream": "The low-drag tow created behind another car, used to close a gap on straights.",
+  "gap": "Time difference between two cars, measured at a fixed point on track.",
+  "sector": "One of three timed segments that together make up a full lap."
+}
