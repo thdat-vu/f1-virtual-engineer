@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { QuestionRotator } from "@/components/landing/QuestionRotator";
 
 const DEMO_HREF =
   "/mission-control?event=Japanese%20Grand%20Prix&session=R&driver=VER&lap=fastest";
@@ -50,6 +51,10 @@ export function LandingHero() {
             <h1 className="display mb-6 text-[length:var(--text-display)] leading-[0.95] text-foreground">
               Ask any lap.<br />Get the call.
             </h1>
+          </FadeUp>
+
+          <FadeUp delay={0.14}>
+            <QuestionRotator />
           </FadeUp>
 
           <FadeUp delay={0.16}>
