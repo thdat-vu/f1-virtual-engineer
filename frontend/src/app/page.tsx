@@ -4,6 +4,7 @@ import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
 import { EvalArcSection } from "@/components/landing/EvalArcSection";
 import { LandingCTA } from "@/components/landing/LandingCTA";
 import { LandingHero } from "@/components/landing/LandingHero";
+import { RaceWeekendPill } from "@/components/landing/RaceWeekendPill";
 import { TeamSwitcher } from "@/components/landing/TeamSwitcher";
 import { Footer } from "@/components/Footer";
 import { readEvalStatus } from "@/lib/eval-status";
@@ -57,6 +58,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-4">
+            <RaceWeekendPill />
             <TeamSwitcher />
             <Link href="/mission-control" className="btn btn--accent">
               Launch
