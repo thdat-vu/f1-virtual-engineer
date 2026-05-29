@@ -260,6 +260,7 @@ html, body {
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
   padding: 0.75rem 1.25rem;
+  cursor: pointer;
   transition: opacity var(--dur-fast) var(--ease-standard),
               transform var(--dur-fast) var(--ease-standard);
 }
@@ -273,6 +274,10 @@ html, body {
   background: var(--accent);
   color: var(--background);
 }
+
+/* Default cursor for any interactive button — UI feedback (#249) */
+button:not(:disabled) { cursor: pointer; }
+[role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
 
 /* Surface card — bordered panel on neutral surface */
 .card {

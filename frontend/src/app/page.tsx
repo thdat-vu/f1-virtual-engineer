@@ -4,6 +4,7 @@ import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
 import { EvalArcSection } from "@/components/landing/EvalArcSection";
 import { LandingCTA } from "@/components/landing/LandingCTA";
 import { LandingHero } from "@/components/landing/LandingHero";
+import { LandingNav } from "@/components/landing/LandingNav";
 import { RaceWeekendPill } from "@/components/landing/RaceWeekendPill";
 import { TeamSwitcher } from "@/components/landing/TeamSwitcher";
 import { Footer } from "@/components/Footer";
@@ -45,17 +46,7 @@ export default function Home() {
             </div>
           </div>
 
-          <nav className="hidden items-center gap-8 md:flex">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-dim transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <LandingNav items={navItems} />
 
           <div className="flex items-center gap-4">
             <RaceWeekendPill />

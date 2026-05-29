@@ -31,9 +31,10 @@ export function TeamSwitcher() {
             key={t.id}
             onClick={() => setTheme(t.id as TeamId)}
             title={t.id}
-            className="shrink-0 rounded-sm transition-all duration-[var(--dur-fast)]"
+            className="shrink-0 cursor-pointer rounded-sm transition-all duration-[var(--dur-fast)]"
             style={{
-              opacity:       active ? 1 : 0.3,
+              opacity:       active ? 1 : 0.4,
+              filter:        active ? "none" : "grayscale(1)",
               transform:     active ? "scale(1.4)" : "scale(1)",
               outline:       active ? `1.5px solid ${t.color}` : "none",
               outlineOffset: "2px",
