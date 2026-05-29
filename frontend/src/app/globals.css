@@ -369,6 +369,26 @@ button:not(:disabled) { cursor: pointer; }
   to   { transform: translateX(-50%); }
 }
 
+/* Mission Control listbox — replace the default scrollbar with a slim
+   monochrome track that matches the readout theme. */
+.mc-listbox {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.mc-listbox::-webkit-scrollbar {
+  width: 6px;
+}
+.mc-listbox::-webkit-scrollbar-track {
+  background: transparent;
+}
+.mc-listbox::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 0;
+}
+.mc-listbox::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-faint);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .telemetry-ribbon__track { animation: none; }
