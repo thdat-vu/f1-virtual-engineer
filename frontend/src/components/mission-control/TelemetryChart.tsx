@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { BoxBoxEmpty } from "@/components/ui/BoxBoxEmpty";
+import { StartingGridLoader } from "@/components/ui/StartingGridLoader";
 
 const CHART_VB_W = 1000;
 const CHART_VB_H = 80;
@@ -150,18 +152,13 @@ export function TelemetryChart({
         >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <motion.div className="h-px w-10 bg-accent"
-                animate={{ scaleX: [1, 2.5, 1], opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-              />
+              <StartingGridLoader />
             </div>
           )}
 
           {!isLoading && !hasData && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="readout text-[length:var(--text-readout)] uppercase tracking-[var(--track-wide)] text-foreground-faint">
-                Select session above and run analysis
-              </span>
+              <BoxBoxEmpty message="Pick a session to start" />
             </div>
           )}
 
