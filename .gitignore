@@ -162,6 +162,7 @@ backend/data/
 !package.json
 !tsconfig.json
 !backend/evals/cases/*.json
+!frontend/src/content/*.json
 
 # Node.js
 node_modules/
@@ -177,3 +178,7 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+
+# Local session notes — gitignored so each dev keeps their own
+docs/SESSION_STATUS.md

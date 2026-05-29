@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CapabilityGrid } from "@/components/landing/CapabilityGrid";
 import { EvalArcSection } from "@/components/landing/EvalArcSection";
+import { FeaturedCard } from "@/components/landing/FeaturedCard";
 import { LandingCTA } from "@/components/landing/LandingCTA";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -60,6 +61,8 @@ export default function Home() {
 
       <div className="relative z-10 mx-auto max-w-6xl px-6">
         <LandingHero />
+
+        <FeaturedCard />
 
         <section id="capabilities" className="py-20">
           <div className="mb-10">
