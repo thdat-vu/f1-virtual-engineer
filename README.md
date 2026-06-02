@@ -12,7 +12,7 @@ An end-to-end agentic AI system that acts as a virtual Formula 1 race engineer. 
 
 ## ▶︎ Try it live
 
-**Mission Control runs in your browser at <https://f1-virtual-engineer.duckdns.org/mission-control>.** Anonymous works — no sign-in needed for the core flow. Optional Google sign-in unlocks per-user history + saved queries (Supabase Auth + RLS).
+**Mission Control runs in your browser at <https://f1.529studio.site/>.** Anonymous works — no sign-in needed for the core flow. Optional Google sign-in unlocks per-user history + saved queries (Supabase Auth + RLS).
 
 Suggested first run:
 
