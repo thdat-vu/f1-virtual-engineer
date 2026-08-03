@@ -103,6 +103,37 @@ class FastF1HelperTests(unittest.TestCase):
         self.assertEqual(result["speed"]["avg"], 0.0)
 
     @patch("tools.fastf1_helper.fastf1.get_session")
+    def test_get_session_telemetry_summary_fallback_when_pick_fastest_returns_none(
+        self, mock_get_session,
+    ):
+        # Issue #257: future / not-yet-run sessions (e.g. 2026 Australian
+        # GP Q before the weekend) load with stub laps that FastF1 then
+        # flags as inaccurate, so pick_fastest() returns None. The old
+        # code did `"LapNumber" in chosen_lap`, raising
+        # `TypeError: argument of type 'NoneType' is not iterable`,
+        # whose str() leaked verbatim into the UI's fallback_reason.
+        mock_laps = MagicMock()
+        mock_laps.empty = False
+        mock_laps.pick_fastest.return_value = None
+
+        mock_session = MagicMock()
+        mock_session.laps.pick_driver.return_value = mock_laps
+        mock_get_session.return_value = mock_session
+
+        result = get_session_telemetry_summary(2026, "Australian Grand Prix", "Q", "VER")
+
+        self.assertTrue(result["fallback"])
+        self.assertEqual(result["sample_points"], 0)
+        self.assertIsNone(result["lap_number"])
+        # The UI must never see the raw Python error message.
+        self.assertNotIn("NoneType", result["fallback_reason"])
+        self.assertNotIn("not iterable", result["fallback_reason"])
+        self.assertEqual(
+            result["fallback_reason"],
+            "Telemetry not yet published for this session.",
+        )
+
+    @patch("tools.fastf1_helper.fastf1.get_session")
     def test_get_session_telemetry_summary_picks_lap_when_lap_number_given(self, mock_get_session):
         # Two laps for the driver; we request lap_number=2 and expect that lap's telemetry.
         laps_df = pd.DataFrame({"LapNumber": [1, 2]})

@@ -26,6 +26,35 @@ fastf1.Cache.enable_cache(CACHE_DIR)
 
 SERIES_POINTS = 200
 
+# Issue #257: when FastF1 can't resolve a fastest/representative lap (every
+# lap flagged inaccurate, no completed laps yet for a session that hasn't
+# happened, etc.) ``pick_fastest()`` returns ``None``. The downstream
+# ``"LapNumber" in chosen_lap`` then raises ``TypeError: argument of type
+# 'NoneType' is not iterable``, and the catch-all in each helper bakes that
+# raw Python phrase into ``fallback_reason``, which then renders verbatim
+# in the UI. Sanitize_fallback_reason maps the known machine phrases to a
+# user-readable sentence so a future / not-yet-run session reads as
+# "Telemetry not yet published for this session." rather than a stack-trace
+# fragment.
+_RAW_PYTHON_ERROR_FRAGMENTS = (
+    "argument of type 'nonetype' is not iterable",
+    "nonetype",
+    "attributeerror",
+    "keyerror",
+    "indexerror",
+    "typeerror",
+)
+
+
+def _sanitize_fallback_reason(reason: str | None, *, default: str) -> str:
+    """Replace raw Python error messages with a user-friendly fallback line."""
+    if not reason:
+        return default
+    lowered = reason.lower()
+    if any(frag in lowered for frag in _RAW_PYTHON_ERROR_FRAGMENTS):
+        return default
+    return reason
+
 
 # In-process result caches for FastF1 helpers (#100 slice B).
 #
@@ -389,7 +418,10 @@ def get_event_drivers(year: int, event: str) -> dict[str, Any]:
         "drivers": [],
         "source_session": None,
         "fallback": True,
-        "fallback_reason": last_error,
+        "fallback_reason": _sanitize_fallback_reason(
+            last_error,
+            default="Driver roster unavailable for this session.",
+        ),
     }
 
 
@@ -453,6 +485,28 @@ def get_session_telemetry_summary(
             chosen_lap_number = int(lap_number)
         else:
             chosen_lap = laps.pick_fastest()
+            # Issue #257: pick_fastest() returns None when every lap is
+            # flagged inaccurate (common for sessions that haven't run yet
+            # or stub data published before the weekend). Without this guard
+            # the next `"LapNumber" in chosen_lap` check raises TypeError,
+            # whose str() used to leak to the UI as a Python error.
+            if chosen_lap is None:
+                return {
+                    "driver": driver,
+                    "year": year,
+                    "event": event,
+                    "session_type": session_type,
+                    "sample_points": 0,
+                    "speed": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "km/h", "series": []},
+                    "gear": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "gear", "series": []},
+                    "rpm": {"min": 0.0, "max": 0.0, "avg": 0.0, "unit": "rpm", "series": []},
+                    "lap_duration_s": None,
+                    "sector_boundaries_s": [],
+                    "source": "fastf1",
+                    "fallback": True,
+                    "fallback_reason": "Telemetry not yet published for this session.",
+                    "lap_number": None,
+                }
             chosen_lap_number = (
                 int(chosen_lap["LapNumber"]) if "LapNumber" in chosen_lap and pd.notna(chosen_lap["LapNumber"]) else None
             )
@@ -482,7 +536,10 @@ def get_session_telemetry_summary(
             "sector_boundaries_s": [],
             "source": "fastf1",
             "fallback": True,
-            "fallback_reason": str(exc),
+            "fallback_reason": _sanitize_fallback_reason(
+                str(exc),
+                default="Telemetry unavailable for this session.",
+            ),
             "lap_number": lap_number,
         }
 
@@ -570,7 +627,10 @@ def get_session_lap_list(
             "laps": [],
             "fastest_lap_number": None,
             "fallback": True,
-            "fallback_reason": str(exc),
+            "fallback_reason": _sanitize_fallback_reason(
+                str(exc),
+                default="Lap roster unavailable for this session.",
+            ),
         }
 
 
@@ -663,7 +723,10 @@ def extract_tyre_wear_features(
             "event": event,
             "session_type": session_type,
             "fallback": True,
-            "fallback_reason": str(exc),
+            "fallback_reason": _sanitize_fallback_reason(
+                str(exc),
+                default="Tyre features unavailable for this session.",
+            ),
             "features": {
                 "lap_count": 0,
                 "stint_count": 0,
